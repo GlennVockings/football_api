@@ -1,0 +1,15 @@
+{
+  "types": [
+    "Goal",
+    "Yellow Card",
+    "Red Card",
+    "Sub"
+  ],
+  "status": [
+    "Postponed",
+    "Upcoming",
+    "Completed",
+    "Home Walkover",
+    "Away Walkover"
+  ]
+}

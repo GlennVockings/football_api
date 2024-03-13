@@ -1,0 +1,20 @@
+{
+  "players": [
+    {
+      "id": "",
+      "firstName": "",
+      "lastName": "",
+      "number": 0,
+      "position": "",
+      "team": "",
+      "goals": 0,
+      "appearances": 0,
+      "assists": 0,
+      "yellowCards": 0,
+      "redCards": 0,
+      "started": 0,
+      "playerOfMatch": 0,
+      "cleanSheets": 0
+    }
+  ]
+}
