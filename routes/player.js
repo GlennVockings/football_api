@@ -9,8 +9,22 @@ const Player = require("../models/player");
 // gets all players
 router.get("/", async (req, res) => {
   try {
-    const players = await Player.find();
-    res.status(201).json(players);
+    let players = Player.find();
+
+    // Check if sort query parameters are provided
+    const sortBy = req.query.sort || "firstName"; // Default sort by firstName
+    const sortOrder = req.query.sortby || "desc"; // Default sort order is ascending
+
+    // Sort the players based on the provided parameters
+    if (sortBy && sortOrder) {
+      const sortCriteria = {};
+      sortCriteria[sortBy] = sortOrder === "desc" ? -1 : 1;
+      players = players.sort(sortCriteria);
+    }
+
+    // Execute the query and send the response
+    players = await players.exec();
+    res.status(200).json(players);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -77,6 +91,10 @@ router.post("/", async (req, res) => {
 
       await newPlayer.save();
 
+      foundTeam.players.push(newPlayer._id);
+
+      await foundTeam.save();
+
       res.status(201).json(newPlayer);
     }
   } catch (err) {
@@ -85,10 +103,27 @@ router.post("/", async (req, res) => {
 });
 
 // DELETE ROUTES
-
 router.delete("/:playerId", getPlayer, async (req, res) => {
   try {
+    // Find the team to which the player belongs
+    const foundTeam = await Team.findById(res.player.team._id);
+
+    // Find the index of the player in the team's players array
+    const playerIndex = foundTeam.players.findIndex(
+      (player) => player.toString() === res.player._id.toString()
+    );
+
+    // If the player is found in the team, remove them from the players array
+    if (playerIndex !== -1) {
+      foundTeam.players.splice(playerIndex, 1);
+    }
+
+    // Save the updated team document
+    await foundTeam.save();
+
+    // Delete the player document
     await Player.findByIdAndDelete(req.params.playerId);
+
     res.status(201).json({ message: "Player deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });

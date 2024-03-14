@@ -3,28 +3,39 @@ const teamsTemplate = [
     name: "Oxted & District",
     players: [],
     ground: ["Master Park", "Bletchingley FC"],
+    league: ""
   },
   {
     name: "Crawley Devils",
     players: [],
     ground: ["Warden park secondary academy 3G"],
+    league: ""
   },
 ];
 
 const playerTemplate = {
   fistName: "Lee",
   lastName: "Peacock",
-  appearances: 14,
-  goals: 4,
-  started: 9,
-  yellowCards: 0,
-  redCards: 0,
-  playerofMatch: 0,
-  cleanSheet: 0,
-  assists: 0,
   number: 0,
   postiion: "",
-  team: "65f1ba72de0e70288a786642",
+  years: [
+    {
+      year: "2023/24",
+      stats: [
+        {
+          team: "65f1ba72de0e70288a786642",
+          appearances: 14,
+          goals: 4,
+          started: 9,
+          yellowCards: 0,
+          redCards: 0,
+          playerofMatch: 0,
+          cleanSheet: 0,
+          assists: 0,
+        }
+      ]
+    }
+  ]
 };
 
 const leagueTemplate = [

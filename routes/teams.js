@@ -65,13 +65,11 @@ router.get("/:teamId", getTeam, async (req, res) => {
 });
 
 // updates team
-router.patch("/:teamId", getTeam, async (req, res) => {
+router.patch("/:teamId", async (req, res) => {
   const updatedTeamData = req.body;
 
   try {
-    res.team = updatedTeamData;
-
-    await res.tea.save();
+    await Team.findByIdAndUpdate(req.params.teamId, updatedTeamData);
 
     res.status(201).json(updatedTeamData);
   } catch (err) {
@@ -141,7 +139,9 @@ router.delete("/:teamId", async (req, res) => {
 async function getTeam(req, res, next) {
   let team;
   try {
-    team = await Team.findById(req.params.teamId).populate("league", "league");
+    team = await Team.findById(req.params.teamId)
+      .populate("league", "league")
+      .populate("players", "firstName lastName");
     if (team == null) {
       return res.status(404).json({ message: "Cannot find team" });
     }
