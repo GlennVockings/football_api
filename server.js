@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const leagueRouter = require("./routes/league");
 const teamsRouter = require("./routes/teams");
 const playerRouter = require("./routes/player");
+const yearsRouter = require("./routes/year");
 
 mongoose.connect(process.env.MONGODB_URI);
 const db = mongoose.connection;
@@ -16,5 +17,6 @@ app.use(express.json());
 app.use("/api/v1/leagues", leagueRouter);
 app.use("/api/v1/teams", teamsRouter);
 app.use("/api/v1/players", playerRouter);
+app.use("/api/v1/year", yearsRouter);
 
 app.listen(3000, () => console.log("Server started"));

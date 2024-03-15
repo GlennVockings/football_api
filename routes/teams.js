@@ -1,7 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const Team = require("../models/team");
-const { League } = require("../models/league");
+const League = require("../models/league");
+const Player = require("../models/player");
+
+const STATUS = "On going";
 
 // Gets all teams
 router.get("/", async (req, res) => {
@@ -79,8 +82,8 @@ router.patch("/:teamId", async (req, res) => {
 
 // add a new team
 router.post("/", async (req, res) => {
-  const { name, ground, league, players } = req.body;
-  const status = "On going";
+  const { name, ground, years } = req.body;
+  const leagueId = years[0].league;
 
   try {
     let existingTeam = await Team.findOne({ name });
@@ -90,7 +93,7 @@ router.post("/", async (req, res) => {
         message: "This team already exists",
       });
     } else {
-      const foundLeague = await League.findById(league);
+      const foundLeague = await League.findById(leagueId);
 
       if (!foundLeague) {
         return res.status(400).json({
@@ -99,14 +102,13 @@ router.post("/", async (req, res) => {
       }
 
       const currentYear = foundLeague.years.find(
-        (year) => year.status === status
+        (year) => year.status === STATUS
       );
 
       const team = new Team({
         name,
         ground,
-        league: foundLeague._id,
-        players,
+        years,
       });
 
       // Save the team
@@ -127,9 +129,40 @@ router.post("/", async (req, res) => {
 // DELETE ROUTES
 
 // delete a team
-router.delete("/:teamId", async (req, res) => {
+router.delete("/:teamId", getTeam, async (req, res) => {
   try {
+    const foundPlayers = await Player.find({
+      "year.status": STATUS,
+      "year.team": res.team._id,
+    });
+
+    // If any player is found, prevent deleting the team
+    if (foundPlayers.length > 0) {
+      return res.status(400).json({
+        message: "Cannot delete team as there are players in this team",
+      });
+    }
+
+    const foundLeague = await League.findById(res.team.league._id);
+
+    const yearIndex = foundLeague.years.findIndex(
+      (year) => year.status === STATUS
+    );
+
+    // Find the index of the player in the team's players array
+    const teamIndex = foundLeague.years[yearIndex].teams.findIndex(
+      (team) => team.toString() === res.team._id.toString()
+    );
+
+    if (teamIndex !== -1) {
+      foundLeague.years[yearIndex].teams.splice(teamIndex, 1);
+    }
+
+    // save updated league with deleted team
+    await foundLeague.save();
+
     await Team.findByIdAndDelete(req.params.teamId);
+
     res.status(201).json({ message: "Deleted team" });
   } catch (err) {
     res.status(500).json({ message: err.message });

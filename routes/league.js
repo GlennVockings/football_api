@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { League } = require("../models/league");
+const League = require("../models/league");
 const Team = require("../models/team");
 
 // GET ROUTES
@@ -8,7 +8,10 @@ const Team = require("../models/team");
 // get all fixtures
 router.get("/", async (req, res) => {
   try {
-    const leagues = await League.find();
+    const leagues = await League.find().populate({
+      path: "years.teams",
+      select: "name",
+    });
     res.status(201).json(leagues);
   } catch (err) {
     res.status(500).json({ message: err.message });

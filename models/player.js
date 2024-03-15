@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 const statsSchema = new Schema({
   team: {
     type: Schema.Types.ObjectId,
-    ref: "Team"
+    ref: "Team",
   },
   appearances: Number,
   goals: Number,
@@ -14,12 +14,13 @@ const statsSchema = new Schema({
   started: Number,
   playerofMatch: Number,
   cleanSheet: Number,
-})
+});
 
 const yearsSchema = new Schema({
   year: String,
-  stats: [statsSchema]
-})
+  status: String,
+  stats: [statsSchema],
+});
 
 const playerSchema = new Schema({
   firstName: {
@@ -32,7 +33,7 @@ const playerSchema = new Schema({
   },
   number: Number,
   position: String,
-  years: [yearsSchema]
-})
+  years: [yearsSchema],
+});
 
 module.exports = mongoose.model("Player", playerSchema);

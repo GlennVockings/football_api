@@ -1,15 +1,27 @@
 const teamsTemplate = [
   {
     name: "Oxted & District",
-    players: [],
     ground: ["Master Park", "Bletchingley FC"],
-    league: ""
+    years: [
+      {
+        year: "2023/24",
+        status: "On going",
+        league: "65f1b8e740fdc5a1088e064b",
+        players: [],
+      },
+    ],
   },
   {
     name: "Crawley Devils",
-    players: [],
     ground: ["Warden park secondary academy 3G"],
-    league: ""
+    years: [
+      {
+        year: "2023/24",
+        status: "On going",
+        league: "65f1b8e740fdc5a1088e064b",
+        players: [],
+      },
+    ],
   },
 ];
 
@@ -21,6 +33,7 @@ const playerTemplate = {
   years: [
     {
       year: "2023/24",
+      status: "On going",
       stats: [
         {
           team: "65f1ba72de0e70288a786642",
@@ -32,10 +45,10 @@ const playerTemplate = {
           playerofMatch: 0,
           cleanSheet: 0,
           assists: 0,
-        }
-      ]
-    }
-  ]
+        },
+      ],
+    },
+  ],
 };
 
 const leagueTemplate = [
