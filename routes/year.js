@@ -3,19 +3,38 @@ const router = express.Router();
 const League = require("../models/league");
 const Team = require("../models/team");
 const Player = require("../models/player");
+const generateFixtures = require("../helper/helpers");
+
+router.patch("/generateFixtures", async (req, res) => {
+  try {
+    const teams = [
+      "Ridgewood",
+      "AFC Varndeanians II",
+      "Godstone",
+      "Ringmer AFC II",
+      "Polegate Town",
+      "Hurstpierpoint",
+      "AFC Uckfield Town II",
+      "DCK",
+      "Sovereign Saints",
+      "West Hoathly",
+    ];
+    const fixturesJSON = generateFixtures(teams);
+    res.status(201).json(fixturesJSON);
+  } catch (err) {
+    res.status(500).json({ messsage: err.message });
+  }
+});
 
 router.patch("/", async (req, res) => {
   try {
-    // Extract year information from the request body
     const { leagueYear, teamYear, playerYear } = req.body;
 
-    // Update all leagues to add a new year
     const league = await League.updateMany(
       {},
       { $push: { years: { year: leagueYear, status: "On going" } } }
     );
 
-    // Update all teams to add a new year
     const team = await Team.updateMany(
       {},
       {
@@ -25,7 +44,6 @@ router.patch("/", async (req, res) => {
       }
     );
 
-    // Update all players to add a new year
     const player = await Player.updateMany(
       {},
       { $push: { years: { year: playerYear, status: "On going" } } }

@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-const yearSchema = new Schema({
-  year: String,
+const seasonSchema = new Schema({
+  season: String,
   status: String,
   league: {
     type: Schema.Types.ObjectId,
@@ -17,7 +17,7 @@ const teamSchema = new Schema({
     required: true,
   },
   ground: [String],
-  years: [yearSchema],
+  seasons: [seasonSchema],
 });
 
 module.exports = mongoose.model("Team", teamSchema);

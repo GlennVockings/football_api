@@ -26,7 +26,7 @@ const fixturesSchema = new Schema({
 });
 
 const seasonSchema = new Schema({
-  year: String,
+  season: String,
   status: String,
   teams: [
     {
@@ -39,7 +39,7 @@ const seasonSchema = new Schema({
 
 const leagueSchema = new Schema({
   league: String,
-  years: [seasonSchema],
+  seasons: [seasonSchema],
 });
 
 module.exports = mongoose.model("League", leagueSchema);

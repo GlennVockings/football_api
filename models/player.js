@@ -16,8 +16,8 @@ const statsSchema = new Schema({
   cleanSheet: Number,
 });
 
-const yearsSchema = new Schema({
-  year: String,
+const seasonSchema = new Schema({
+  season: String,
   status: String,
   stats: [statsSchema],
 });
@@ -33,7 +33,7 @@ const playerSchema = new Schema({
   },
   number: Number,
   position: String,
-  years: [yearsSchema],
+  seasons: [seasonSchema],
 });
 
 module.exports = mongoose.model("Player", playerSchema);

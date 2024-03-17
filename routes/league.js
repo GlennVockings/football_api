@@ -18,7 +18,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// get a specific year's fixtures
+// get league info
 router.get("/:leagueId", getLeague, (req, res) => {
   try {
     res.status(201).json(res.league);
@@ -44,32 +44,6 @@ router.get("/:leagueId/:yearId", getLeague, (req, res) => {
 });
 
 // PATCH ROUTES
-
-// add new year to a league
-router.patch("/:leagueId", getLeague, async (req, res) => {
-  const newYearData = req.body;
-
-  try {
-    // Check if a league with the same name already exists
-    const existingYear = res.league.years.find(
-      (league) => league.league === newYearData.league
-    );
-    if (existingYear) {
-      return res.status(400).json({
-        message: "Year already exists in this league",
-      });
-    }
-    // Add the new league to the season
-    res.league.years.push(newYearData);
-
-    // Save the updated season
-    const newLeague = await res.league.save();
-
-    res.status(201).json(newLeague);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
 
 // update a year to add more fixtures if necessary
 router.patch("/:leagueId/:yearId", getLeague, async (req, res) => {
@@ -103,7 +77,6 @@ router.patch("/:leagueId/:yearId/:fixtureId", getLeague, (req, res) => {
       return res.status(404).send("League not found");
     }
 
-    // Find the requested fixture in the leagueData
     const fixtureIndex = res.league.years[yearIndex].fixtures.findIndex(
       (fixture) => fixture.id === fixtureId
     );
@@ -126,10 +99,8 @@ router.patch("/:leagueId/:yearId/:fixtureId", getLeague, (req, res) => {
 router.post("/", async (req, res) => {
   const leagueName = req.body.league;
   try {
-    // checks if a year of the same name exists
     let existingLeague = await League.findOne({ league: leagueName });
 
-    // if the year already exists then tells the user if not then adds it
     if (existingLeague) {
       res.status(400).json({
         message: "This season already exists",
@@ -152,7 +123,6 @@ router.post("/", async (req, res) => {
 // deletes a given year
 router.delete("/:leagueId", getLeague, async (req, res) => {
   try {
-    // fins and deletes the specific year
     await League.findByIdAndDelete(req.params.leagueId);
     res.status(201).json({ message: "Deleted league" });
   } catch (err) {
@@ -163,12 +133,10 @@ router.delete("/:leagueId", getLeague, async (req, res) => {
 async function getLeague(req, res, next) {
   let league;
   try {
-    // find the year with the matching id
     league = await League.findById(req.params.leagueId).populate({
       path: "years.teams",
       select: "name",
     });
-    // if no year is found then fire a message telling the user
     if (league == null) {
       return res.status(404).json({ message: "Cannot find league" });
     }
