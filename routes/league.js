@@ -25,7 +25,7 @@ router.get("/:leagueId", getLeague, (req, res) => {
 });
 
 // get a specific league's fixtures
-router.get("/:leagueId/:seasonId", getLeague, (req, res) => {
+router.get("/:leagueId/:seasonId", authenticateToken, getLeague, (req, res) => {
   const seasonId = req.params.seasonId;
 
   try {
@@ -91,34 +91,40 @@ router.patch(
 );
 
 // update a fixture
-router.patch("/:leagueId/:seasonId/:fixtureId", getLeague, (req, res) => {
-  const seasonId = req.params.seasonId;
-  const fixtureId = req.params.fixtureId;
-  const updatedFixtureData = req.body;
+router.patch(
+  "/:leagueId/:seasonId/:fixtureId",
+  authenticateToken,
+  getLeague,
+  (req, res) => {
+    const seasonId = req.params.seasonId;
+    const fixtureId = req.params.fixtureId;
+    const updatedFixtureData = req.body;
 
-  try {
-    const seasonIndex = res.league.seasons.findIndex(
-      (season) => season.id === seasonId
-    );
-    if (seasonIndex === -1) {
-      return res.status(404).send("League not found");
+    try {
+      const seasonIndex = res.league.seasons.findIndex(
+        (season) => season.id === seasonId
+      );
+      if (seasonIndex === -1) {
+        return res.status(404).send("League not found");
+      }
+
+      const fixtureIndex = res.league.seasons[seasonIndex].fixtures.findIndex(
+        (fixture) => fixture.id === fixtureId
+      );
+      if (fixtureIndex === -1) {
+        return res.status(404).send("Fixture not found");
+      }
+
+      res.league.seasons[seasonIndex].fixtures[fixtureIndex] =
+        updatedFixtureData;
+
+      const newLeague = res.league.save();
+      res.status(201).json(newLeague);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
     }
-
-    const fixtureIndex = res.league.seasons[seasonIndex].fixtures.findIndex(
-      (fixture) => fixture.id === fixtureId
-    );
-    if (fixtureIndex === -1) {
-      return res.status(404).send("Fixture not found");
-    }
-
-    res.league.seasons[seasonIndex].fixtures[fixtureIndex] = updatedFixtureData;
-
-    const newLeague = res.league.save();
-    res.status(201).json(newLeague);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
   }
-});
+);
 
 // POST ROUTES
 
@@ -148,7 +154,7 @@ router.post("/", authenticateToken, async (req, res) => {
 // DELETE ROUTES
 
 // deletes a given season
-router.delete("/:leagueId", getLeague, async (req, res) => {
+router.delete("/:leagueId", authenticateToken, getLeague, async (req, res) => {
   try {
     await League.findByIdAndDelete(req.params.leagueId);
     res.status(201).json({ message: "Deleted league" });

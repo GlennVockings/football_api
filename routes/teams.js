@@ -3,24 +3,13 @@ const router = express.Router();
 const Team = require("../models/team");
 const League = require("../models/league");
 const Player = require("../models/player");
-
-const STATUS = "On going";
+const { authenticateToken } = require("../middleware/auth");
 
 // Gets all teams
-router.get("/", async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    // Extract the name query parameter from the request
-    const teamNameParam = req.query.name;
+    const teams = await Team.find().populate("seasons.league", "league");
 
-    // Decode the URL-encoded query parameter
-    const teamName = teamNameParam;
-
-    // Perform a case-insensitive search for teams with matching names
-    const teams = await Team.find({
-      name: { $regex: new RegExp(teamName, "i") },
-    }).populate("league", "league");
-
-    // Return the matching teams
     res.status(200).json(teams);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -28,39 +17,34 @@ router.get("/", async (req, res) => {
 });
 
 // Get specific team
-router.get("/:teamId", getTeam, async (req, res) => {
+router.get("/:teamId", authenticateToken, getTeam, async (req, res) => {
   try {
     const teamName = res.team.name;
 
     // Aggregate to find fixtures where the team is either home or away
     const fixtures = await League.aggregate([
-      { $unwind: "$years" },
-      { $unwind: "$years.fixtures" },
+      { $unwind: "$seasons" },
+      { $unwind: "$seasons.fixtures" },
       {
         $match: {
-          $and: [
-            {
-              $or: [
-                { "years.fixtures.home": teamName },
-                { "years.fixtures.away": teamName },
-              ],
-            },
-            { "years.status": "On going" },
+          $or: [
+            { "seasons.fixtures.home": teamName },
+            { "seasons.fixtures.away": teamName },
           ],
         },
       },
       {
         $group: {
-          _id: null,
-          fixtures: { $push: "$years.fixtures" },
+          _id: "$seasons.season",
+          fixtures: { $push: "$seasons.fixtures" },
         },
       },
-      { $project: { _id: 0 } },
+      { $project: { _id: 0, season: "$_id", fixtures: 1 } },
     ]);
 
-    res.status(201).json({
+    res.status(200).json({
       team: res.team,
-      fixtures: fixtures.length ? fixtures[0].fixtures : [],
+      fixtures: fixtures,
     });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -68,22 +52,44 @@ router.get("/:teamId", getTeam, async (req, res) => {
 });
 
 // updates team
-router.patch("/:teamId", async (req, res) => {
-  const updatedTeamData = req.body;
-
+router.patch("/:teamId", authenticateToken, async (req, res) => {
+  const { name, ground, seasons } = req.body;
+  let foundTeam;
   try {
-    await Team.findByIdAndUpdate(req.params.teamId, updatedTeamData);
+    foundTeam = await Team.findById(req.params.teamId).then((team) => {
+      team.name = name;
+      team.ground = ground;
+      teams.seasons = seasons;
+      team.save();
+    });
 
-    res.status(201).json(updatedTeamData);
+    for (let i = 0; i < seasons.length; i++) {
+      const { league, season: teamSeason } = seasons[i];
+
+      const foundLeague = await League.findById(league);
+
+      const currentSeason = foundLeague.seasons.find(
+        (season) => season.season === teamSeason
+      );
+
+      const teamCheck = currentSeason.teams.find(team._id);
+
+      if (teamCheck !== null) {
+        currentSeason.teams.push(team._id);
+      }
+
+      await foundLeague.save();
+    }
+
+    res.status(201).json(foundTeam);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 });
 
 // add a new team
-router.post("/", async (req, res) => {
-  const { name, ground, years } = req.body;
-  const leagueId = years[0].league;
+router.post("/", authenticateToken, async (req, res) => {
+  const { name, ground, seasons } = req.body;
 
   try {
     let existingTeam = await Team.findOne({ name });
@@ -93,31 +99,29 @@ router.post("/", async (req, res) => {
         message: "This team already exists",
       });
     } else {
-      const foundLeague = await League.findById(leagueId);
-
-      if (!foundLeague) {
-        return res.status(400).json({
-          message: "League not found",
-        });
-      }
-
-      const currentYear = foundLeague.years.find(
-        (year) => year.status === STATUS
-      );
-
+      // create and save new team to get a _id
       const team = new Team({
         name,
         ground,
-        years,
+        seasons,
       });
 
-      // Save the team
       await team.save();
 
-      // Push the team ID to the league's teams array
-      currentYear.teams.push(team._id);
+      // run through the teams seasons and add to corresponding leagues season
+      for (let i = 0; i < seasons.length; i++) {
+        const { league, season: teamSeason } = seasons[i];
 
-      await foundLeague.save();
+        const foundLeague = await League.findById(league);
+
+        const currentSeason = foundLeague.seasons.find(
+          (season) => season.season === teamSeason
+        );
+
+        currentSeason.teams.push(team._id);
+
+        await foundLeague.save();
+      }
 
       res.status(201).json(team);
     }
@@ -129,11 +133,10 @@ router.post("/", async (req, res) => {
 // DELETE ROUTES
 
 // delete a team
-router.delete("/:teamId", getTeam, async (req, res) => {
+router.delete("/:teamId", authenticateToken, getTeam, async (req, res) => {
   try {
     const foundPlayers = await Player.find({
-      "year.status": STATUS,
-      "year.team": res.team._id,
+      "seasons.season.team": res.team._id,
     });
 
     // If any player is found, prevent deleting the team
@@ -145,17 +148,17 @@ router.delete("/:teamId", getTeam, async (req, res) => {
 
     const foundLeague = await League.findById(res.team.league._id);
 
-    const yearIndex = foundLeague.years.findIndex(
-      (year) => year.status === STATUS
+    const seasonIndex = foundLeague.seasons.findIndex(
+      (season) => season.status === STATUS
     );
 
     // Find the index of the player in the team's players array
-    const teamIndex = foundLeague.years[yearIndex].teams.findIndex(
+    const teamIndex = foundLeague.seasons[seasonIndex].teams.findIndex(
       (team) => team.toString() === res.team._id.toString()
     );
 
     if (teamIndex !== -1) {
-      foundLeague.years[yearIndex].teams.splice(teamIndex, 1);
+      foundLeague.seasons[seasonIndex].teams.splice(teamIndex, 1);
     }
 
     // save updated league with deleted team
@@ -173,8 +176,8 @@ async function getTeam(req, res, next) {
   let team;
   try {
     team = await Team.findById(req.params.teamId)
-      .populate("league", "league")
-      .populate("players", "firstName lastName");
+      .populate("seasons.league", "league")
+      .populate("seasons.players", "firstName lastName");
     if (team == null) {
       return res.status(404).json({ message: "Cannot find team" });
     }
