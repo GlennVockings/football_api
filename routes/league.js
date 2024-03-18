@@ -1,17 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const League = require("../models/league");
-const Team = require("../models/team");
+const { authenticateToken } = require("../middleware/auth");
 
 // GET ROUTES
 
 // get all fixtures
-router.get("/", async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    const leagues = await League.find().populate({
-      path: "years.teams",
-      select: "name",
-    });
+    const leagues = await League.find();
     res.status(201).json(leagues);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -28,16 +25,18 @@ router.get("/:leagueId", getLeague, (req, res) => {
 });
 
 // get a specific league's fixtures
-router.get("/:leagueId/:yearId", getLeague, (req, res) => {
-  const yearId = req.params.yearId;
+router.get("/:leagueId/:seasonId", getLeague, (req, res) => {
+  const seasonId = req.params.seasonId;
 
   try {
-    const yearData = res.league.years.find((year) => year.id === yearId);
-    if (!yearData) {
+    const seasonData = res.league.seasons.find(
+      (season) => season.id === seasonId
+    );
+    if (!seasonData) {
       return res.status(404).send("League not found");
     }
 
-    res.status(201).json(yearData);
+    res.status(201).json(seasonData);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -45,46 +44,74 @@ router.get("/:leagueId/:yearId", getLeague, (req, res) => {
 
 // PATCH ROUTES
 
-// update a year to add more fixtures if necessary
-router.patch("/:leagueId/:yearId", getLeague, async (req, res) => {
-  const yearId = req.params.yearId;
-  const updatedYear = req.body;
-
+// update a season to add more fixtures if necessary
+router.patch("/:leagueId", authenticateToken, async (req, res) => {
+  const { league: leagueName, seasons } = req.body;
+  let updatedLeague;
   try {
-    const yaerIndex = res.league.years.findIndex((year) => year.id === yearId);
-    if (yaerIndex === -1) {
-      return res.status(404).send("League not found");
-    }
+    updatedLeague = await League.findById(req.params.leagueId).then(
+      (league) => {
+        league.league = leagueName;
+        league.seasons = seasons;
+        league.save();
+      }
+    );
 
-    res.league.years[yaerIndex] = updatedYear;
-    res.league.save();
-
-    res.status(201).json(res.league);
+    res.status(201).json(updatedLeague);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
+// update a season to add more fixtures if necessary
+router.patch(
+  "/:leagueId/:seasonId",
+  authenticateToken,
+  getLeague,
+  async (req, res) => {
+    const seasonId = req.params.seasonId;
+    const updatedseason = req.body;
+
+    try {
+      const yaerIndex = res.league.seasons.findIndex(
+        (season) => season.id === seasonId
+      );
+      if (yaerIndex === -1) {
+        return res.status(404).send("League not found");
+      }
+
+      res.league.seasons[yaerIndex] = updatedseason;
+      res.league.save();
+
+      res.status(201).json(res.league);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  }
+);
+
 // update a fixture
-router.patch("/:leagueId/:yearId/:fixtureId", getLeague, (req, res) => {
-  const yearId = req.params.yearId;
+router.patch("/:leagueId/:seasonId/:fixtureId", getLeague, (req, res) => {
+  const seasonId = req.params.seasonId;
   const fixtureId = req.params.fixtureId;
   const updatedFixtureData = req.body;
 
   try {
-    const yearIndex = res.league.years.findIndex((year) => year.id === yearId);
-    if (yearIndex === -1) {
+    const seasonIndex = res.league.seasons.findIndex(
+      (season) => season.id === seasonId
+    );
+    if (seasonIndex === -1) {
       return res.status(404).send("League not found");
     }
 
-    const fixtureIndex = res.league.years[yearIndex].fixtures.findIndex(
+    const fixtureIndex = res.league.seasons[seasonIndex].fixtures.findIndex(
       (fixture) => fixture.id === fixtureId
     );
     if (fixtureIndex === -1) {
       return res.status(404).send("Fixture not found");
     }
 
-    res.league.years[yearIndex].fixtures[fixtureIndex] = updatedFixtureData;
+    res.league.seasons[seasonIndex].fixtures[fixtureIndex] = updatedFixtureData;
 
     const newLeague = res.league.save();
     res.status(201).json(newLeague);
@@ -96,7 +123,7 @@ router.patch("/:leagueId/:yearId/:fixtureId", getLeague, (req, res) => {
 // POST ROUTES
 
 // create a new season
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
   const leagueName = req.body.league;
   try {
     let existingLeague = await League.findOne({ league: leagueName });
@@ -108,7 +135,7 @@ router.post("/", async (req, res) => {
     } else {
       const newLeague = new League({
         league: leagueName,
-        years: req.body.years,
+        seasons: req.body.seasons,
       });
       await newLeague.save();
       res.status(201).json(newLeague);
@@ -120,7 +147,7 @@ router.post("/", async (req, res) => {
 
 // DELETE ROUTES
 
-// deletes a given year
+// deletes a given season
 router.delete("/:leagueId", getLeague, async (req, res) => {
   try {
     await League.findByIdAndDelete(req.params.leagueId);
@@ -134,7 +161,7 @@ async function getLeague(req, res, next) {
   let league;
   try {
     league = await League.findById(req.params.leagueId).populate({
-      path: "years.teams",
+      path: "seasons.teams",
       select: "name",
     });
     if (league == null) {
