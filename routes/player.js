@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const Team = require("../models/team");
 const Player = require("../models/player");
@@ -10,14 +11,14 @@ const { getPlayer } = require("../middleware/getHelpers");
 // gets all players
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    let players = Player.find();
-    res.status(200).json(players);
+    let players = await Player.find();
+    res.status(201).json(players);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.get("/:playerId", getPlayer, async (req, res) => {
+router.get("/:playerId", authenticateToken, getPlayer, async (req, res) => {
   try {
     res.status(201).json(res.player);
   } catch (err) {
@@ -27,13 +28,14 @@ router.get("/:playerId", getPlayer, async (req, res) => {
 
 // PATCH ROUTES
 
-router.patch("/:playerId", async (req, res) => {
+router.patch("/:playerId", authenticateToken, async (req, res) => {
   const { firstName, lastName, number, position, seasons } = req.body;
   let foundPlayer;
   try {
     seasons.forEach((season) => {
-      season.stats.forEach((stat) => {
-        stat.team = mongoose.Types.ObjectId(stat.team);
+      season.stats.forEach(async (stat) => {
+        const foundTeam = await Team.find(stat.team);
+        stat.team = foundTeam._id;
       });
     });
 
@@ -76,7 +78,7 @@ router.patch("/:playerId", async (req, res) => {
 
 // POST ROUTES
 
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
   const { firstName, lastName, seasons } = req.body;
 
   try {
@@ -87,7 +89,7 @@ router.post("/", async (req, res) => {
     } else {
       seasons.forEach((season) => {
         season.stats.forEach((stat) => {
-          stat.team = mongoose.Types.ObjectId(stat.team);
+          stat.team = new mongoose.Types.ObjectId(stat.team);
         });
       });
 
@@ -107,8 +109,8 @@ router.post("/", async (req, res) => {
             return res.status(400).json({ message: "Team not found" });
           }
 
-          const foundSeason = foundTeam.seasons.find(
-            (season) => season.season === playerSeason
+          const foundSeason = await foundTeam.seasons.find(
+            (season) => season.season === playerSeason.season
           );
 
           foundSeason.players.push(newPlayer._id);
@@ -125,23 +127,29 @@ router.post("/", async (req, res) => {
 });
 
 // DELETE ROUTES
-router.delete("/:playerId", getPlayer, async (req, res) => {
+router.delete("/:playerId", authenticateToken, getPlayer, async (req, res) => {
   try {
-    // Find the team to which the player belongs
-    const foundTeam = await Team.findById(res.player.team._id);
+    res.player.seasons.forEach((playerSeason) => {
+      playerSeason.stats.forEach(async (stat) => {
+        const foundTeam = await Team.findById(stat.team._id);
 
-    // Find the index of the player in the team's players array
-    const playerIndex = foundTeam.players.findIndex(
-      (player) => player.toString() === res.player._id.toString()
-    );
+        if (!foundTeam) {
+          return res.status(400).json({ message: "Team not found" });
+        }
 
-    // If the player is found in the team, remove them from the players array
-    if (playerIndex !== -1) {
-      foundTeam.players.splice(playerIndex, 1);
-    }
+        const foundSeason = await foundTeam.seasons.find(
+          (season) => season.season === playerSeason.season
+        );
 
-    // Save the updated team document
-    await foundTeam.save();
+        const playerIndex = await foundSeason.players.findIndex(
+          (player) => player._id === res.player._id
+        );
+
+        foundSeason.players.splice(playerIndex, 1);
+
+        await foundTeam.save();
+      });
+    });
 
     // Delete the player document
     await Player.findByIdAndDelete(req.params.playerId);

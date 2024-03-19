@@ -1,3 +1,7 @@
+const Team = require("../models/team");
+const League = require("../models/league");
+const Player = require("../models/player");
+
 async function getTeam(req, res, next) {
   let team;
   try {
@@ -37,7 +41,7 @@ async function getPlayer(req, res, next) {
   let player;
   try {
     player = await Player.findById(req.params.playerId).populate(
-      "team",
+      "seasons.stats.team",
       "name"
     );
     if (player == null) {
