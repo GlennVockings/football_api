@@ -5,6 +5,7 @@ const League = require("../models/league");
 const Player = require("../models/player");
 const { authenticateToken } = require("../middleware/auth");
 const { getTeam } = require("../middleware/getHelpers");
+const player = require("../models/player");
 
 // Gets all teams
 router.get("/", authenticateToken, async (req, res) => {
@@ -52,38 +53,55 @@ router.get("/:teamId", authenticateToken, getTeam, async (req, res) => {
   }
 });
 
-// updates team
+// updates team information
 router.patch("/:teamId", authenticateToken, async (req, res) => {
-  const { name, ground, seasons } = req.body;
+  const { name, ground } = req.body;
   const teamId = req.params.teamId;
   let foundTeam;
   try {
     foundTeam = await Team.findById(teamId).then((team) => {
       team.name = name;
       team.ground = ground;
-      team.seasons = seasons;
       team.save();
     });
 
-    for (let i = 0; i < seasons.length; i++) {
-      const { league, season: teamSeason } = seasons[i];
+    res.status(201).json(foundTeam);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
 
-      const foundLeague = await League.findById(league);
-
-      const currentSeason = foundLeague.seasons.find(
-        (season) => season.season === teamSeason
-      );
-
-      const teamCheck = currentSeason.teams.find(teamId);
-
-      if (teamCheck !== null) {
-        currentSeason.teams.push(teamId);
-      }
-
-      await foundLeague.save();
+// Adds a new season the team model
+router.patch("/addSeason/:teamId", authenticateToken, async (req, res) => {
+  const { season, status, league, players } = req.body;
+  let foundPlayers = [];
+  try {
+    if (league === "") {
+      return res.status(404).json({ message: "No league entered" });
     }
 
-    res.status(201).json(foundTeam);
+    const foundLeague = await League.findById(league);
+
+    if (players.length > 0) {
+      player.forEach(async (player) => {
+        const foundPlayer = await Player.findById(player);
+
+        foundPlayers.push(foundPlayer._id);
+      });
+    }
+
+    const team = await Team.findById(req.params.teamId);
+
+    team.seasons.push({
+      season,
+      status,
+      league: foundLeague._id,
+      players: foundPlayers,
+    });
+
+    await team.save();
+
+    res.status(201).json({ message: "New season added" });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

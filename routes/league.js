@@ -45,15 +45,45 @@ router.get("/:leagueId/:seasonId", authenticateToken, getLeague, (req, res) => {
 
 // PATCH ROUTES
 
-// update a season to add more fixtures if necessary
+// update a league's name
 router.patch("/:leagueId", authenticateToken, async (req, res) => {
-  const { league: leagueName, seasons } = req.body;
+  const { league: leagueName } = req.body;
   let updatedLeague;
   try {
     updatedLeague = await League.findById(req.params.leagueId).then(
       (league) => {
         league.league = leagueName;
-        league.seasons = seasons;
+        league.save();
+      }
+    );
+
+    res.status(201).json(updatedLeague);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// update a league to add more seasons if necessary
+router.patch("/addSeason/:leagueId", authenticateToken, async (req, res) => {
+  const { season, status, teams, fixtures } = req.body;
+  let updatedLeague;
+  let foundTeams = [];
+  try {
+    if (teams.length > 0) {
+      teams.forEach(async (team) => {
+        const foundTeam = await Team.findById(team);
+        foundTeams.push(foundTeam._id);
+      });
+    }
+
+    updatedLeague = await League.findById(req.params.leagueId).then(
+      (league) => {
+        league.seasons.push({
+          season,
+          status,
+          teams: foundTeams,
+          fixtures,
+        });
         league.save();
       }
     );
@@ -74,14 +104,14 @@ router.patch(
     const updatedseason = req.body;
 
     try {
-      const yaerIndex = res.league.seasons.findIndex(
+      const yearIndex = res.league.seasons.findIndex(
         (season) => season.id === seasonId
       );
-      if (yaerIndex === -1) {
+      if (yearIndex === -1) {
         return res.status(404).send("League not found");
       }
 
-      res.league.seasons[yaerIndex] = updatedseason;
+      res.league.seasons[yearIndex] = updatedseason;
       res.league.save();
 
       res.status(201).json(res.league);

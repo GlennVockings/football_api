@@ -63,7 +63,7 @@ router.patch("/:playerId", authenticateToken, async (req, res) => {
         const playerCheck = foundSeason.players.find(foundPlayer._id);
 
         if (playerCheck !== null) {
-          foundSeason.players.push(newPlayer._id);
+          foundSeason.players.push(foundPlayer._id);
         }
 
         await foundTeam.save();
@@ -109,7 +109,7 @@ router.post("/", authenticateToken, async (req, res) => {
             return res.status(400).json({ message: "Team not found" });
           }
 
-          const foundSeason = await foundTeam.seasons.find(
+          const foundSeason = foundTeam.seasons.find(
             (season) => season.season === playerSeason.season
           );
 
