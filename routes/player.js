@@ -2,27 +2,15 @@ const express = require("express");
 const router = express.Router();
 const Team = require("../models/team");
 const Player = require("../models/player");
+const { authenticateToken } = require("../middleware/auth");
+const { getPlayer } = require("../middleware/getHelpers");
 
 // GET ROUTES
 
 // gets all players
-router.get("/", async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
     let players = Player.find();
-
-    // Check if sort query parameters are provided
-    const sortBy = req.query.sort || "firstName"; // Default sort by firstName
-    const sortOrder = req.query.sortby || "desc"; // Default sort order is ascending
-
-    // Sort the players based on the provided parameters
-    if (sortBy && sortOrder) {
-      const sortCriteria = {};
-      sortCriteria[sortBy] = sortOrder === "desc" ? -1 : 1;
-      players = players.sort(sortCriteria);
-    }
-
-    // Execute the query and send the response
-    players = await players.exec();
     res.status(200).json(players);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -40,16 +28,47 @@ router.get("/:playerId", getPlayer, async (req, res) => {
 // PATCH ROUTES
 
 router.patch("/:playerId", async (req, res) => {
-  const updatedPlayerData = req.body;
-
+  const { firstName, lastName, number, position, seasons } = req.body;
+  let foundPlayer;
   try {
-    const updatedPlayer = await Player.findByIdAndUpdate(
-      req.params.playerId,
-      updatedPlayerData,
-      { new: true } // Return the updated document
-    );
+    seasons.forEach((season) => {
+      season.stats.forEach((stat) => {
+        stat.team = mongoose.Types.ObjectId(stat.team);
+      });
+    });
 
-    res.status(201).json(updatedPlayer);
+    foundPlayer = await Player.findById(req.params.playerId).then((player) => {
+      player.firstName = firstName;
+      player.lastName = lastName;
+      player.number = number;
+      player.position = position;
+      player.seasons = seasons;
+      player.save();
+    });
+
+    seasons.forEach((playerSeason) => {
+      playerSeason.stats.forEach(async (stat) => {
+        const foundTeam = await Team.findById(stat.team);
+
+        if (!foundTeam) {
+          return res.status(400).json({ message: "Team not found" });
+        }
+
+        const foundSeason = foundTeam.seasons.find(
+          (season) => season.season === playerSeason
+        );
+
+        const playerCheck = foundSeason.players.find(foundPlayer._id);
+
+        if (playerCheck !== null) {
+          foundSeason.players.push(newPlayer._id);
+        }
+
+        await foundTeam.save();
+      });
+    });
+
+    res.status(201).json(foundPlayer);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -58,7 +77,7 @@ router.patch("/:playerId", async (req, res) => {
 // POST ROUTES
 
 router.post("/", async (req, res) => {
-  const { firstName, lastName, team } = req.body;
+  const { firstName, lastName, seasons } = req.body;
 
   try {
     let existingPlayer = await Player.findOne({ firstName, lastName });
@@ -66,33 +85,37 @@ router.post("/", async (req, res) => {
     if (existingPlayer) {
       return res.status(400).json({ message: "This player already exists" });
     } else {
-      const foundTeam = await Team.findById(team);
-
-      if (!foundTeam) {
-        return res.status(400).json({ message: "Team not found" });
-      }
+      seasons.forEach((season) => {
+        season.stats.forEach((stat) => {
+          stat.team = mongoose.Types.ObjectId(stat.team);
+        });
+      });
 
       const newPlayer = new Player({
         firstName,
         lastName,
-        number: req.body.number,
-        position: req.body.position,
-        appearances: req.body.appearances,
-        goals: req.body.goals,
-        assists: req.body.assists,
-        yellowCards: req.body.yellowCards,
-        redCards: req.body.redCards,
-        started: req.body.started,
-        playerofMatch: req.body.playerofMatch,
-        cleanSheet: req.body.cleanSheet,
-        team: foundTeam._id,
+        seasons,
       });
 
       await newPlayer.save();
 
-      foundTeam.players.push(newPlayer._id);
+      seasons.forEach((playerSeason) => {
+        playerSeason.stats.forEach(async (stat) => {
+          const foundTeam = await Team.findById(stat.team);
 
-      await foundTeam.save();
+          if (!foundTeam) {
+            return res.status(400).json({ message: "Team not found" });
+          }
+
+          const foundSeason = foundTeam.seasons.find(
+            (season) => season.season === playerSeason
+          );
+
+          foundSeason.players.push(newPlayer._id);
+
+          await foundTeam.save();
+        });
+      });
 
       res.status(201).json(newPlayer);
     }
@@ -128,23 +151,5 @@ router.delete("/:playerId", getPlayer, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-async function getPlayer(req, res, next) {
-  let player;
-  try {
-    player = await Player.findById(req.params.playerId).populate(
-      "team",
-      "name"
-    );
-    if (player == null) {
-      return res.status(404).json({ message: "Cannot find player" });
-    }
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-
-  res.player = player;
-  next();
-}
 
 module.exports = router;

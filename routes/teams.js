@@ -4,6 +4,7 @@ const Team = require("../models/team");
 const League = require("../models/league");
 const Player = require("../models/player");
 const { authenticateToken } = require("../middleware/auth");
+const { getTeam } = require("../middleware/getHelpers");
 
 // Gets all teams
 router.get("/", authenticateToken, async (req, res) => {
@@ -54,12 +55,13 @@ router.get("/:teamId", authenticateToken, getTeam, async (req, res) => {
 // updates team
 router.patch("/:teamId", authenticateToken, async (req, res) => {
   const { name, ground, seasons } = req.body;
+  const teamId = req.params.teamId;
   let foundTeam;
   try {
-    foundTeam = await Team.findById(req.params.teamId).then((team) => {
+    foundTeam = await Team.findById(teamId).then((team) => {
       team.name = name;
       team.ground = ground;
-      teams.seasons = seasons;
+      team.seasons = seasons;
       team.save();
     });
 
@@ -72,10 +74,10 @@ router.patch("/:teamId", authenticateToken, async (req, res) => {
         (season) => season.season === teamSeason
       );
 
-      const teamCheck = currentSeason.teams.find(team._id);
+      const teamCheck = currentSeason.teams.find(teamId);
 
       if (teamCheck !== null) {
-        currentSeason.teams.push(team._id);
+        currentSeason.teams.push(teamId);
       }
 
       await foundLeague.save();
@@ -171,22 +173,5 @@ router.delete("/:teamId", authenticateToken, getTeam, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-async function getTeam(req, res, next) {
-  let team;
-  try {
-    team = await Team.findById(req.params.teamId)
-      .populate("seasons.league", "league")
-      .populate("seasons.players", "firstName lastName");
-    if (team == null) {
-      return res.status(404).json({ message: "Cannot find team" });
-    }
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-
-  res.team = team;
-  next();
-}
 
 module.exports = router;

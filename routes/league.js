@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const League = require("../models/league");
 const { authenticateToken } = require("../middleware/auth");
+const { getLeague } = require("../middleware/getHelpers");
 
 // GET ROUTES
 
@@ -162,23 +163,5 @@ router.delete("/:leagueId", authenticateToken, getLeague, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-async function getLeague(req, res, next) {
-  let league;
-  try {
-    league = await League.findById(req.params.leagueId).populate({
-      path: "seasons.teams",
-      select: "name",
-    });
-    if (league == null) {
-      return res.status(404).json({ message: "Cannot find league" });
-    }
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-
-  res.league = league;
-  next();
-}
 
 module.exports = router;
