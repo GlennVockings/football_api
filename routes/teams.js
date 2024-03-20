@@ -73,7 +73,7 @@ router.patch("/:teamId", authenticateToken, async (req, res) => {
 
 // Adds a new season the team model
 router.patch("/addSeason/:teamId", authenticateToken, async (req, res) => {
-  const { season, status, league, players } = req.body;
+  const { season: teamSeason, status, league, players } = req.body;
   let foundPlayers = [];
   try {
     if (league === "") {
@@ -89,11 +89,18 @@ router.patch("/addSeason/:teamId", authenticateToken, async (req, res) => {
         foundPlayers.push(foundPlayer._id);
       });
     }
+    const foundSeason = foundLeague.seasons.findIndex(
+      (season) => season.season === teamSeason
+    );
+
+    foundLeague.seasons[foundSeason].teams.push(req.params.teamId);
+
+    await foundLeague.save();
 
     const team = await Team.findById(req.params.teamId);
 
     team.seasons.push({
-      season,
+      season: teamSeason,
       status,
       league: foundLeague._id,
       players: foundPlayers,

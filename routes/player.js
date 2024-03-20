@@ -88,8 +88,9 @@ router.post("/", authenticateToken, async (req, res) => {
       return res.status(400).json({ message: "This player already exists" });
     } else {
       seasons.forEach((season) => {
-        season.stats.forEach((stat) => {
-          stat.team = new mongoose.Types.ObjectId(stat.team);
+        season.stats.forEach(async (stat) => {
+          const foundTeam = await Team.find(stat.team);
+          stat.team = foundTeam._id;
         });
       });
 
