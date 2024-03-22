@@ -76,52 +76,95 @@ router.patch("/:playerId", authenticateToken, async (req, res) => {
   }
 });
 
+router.patch("/addSeason/:playerId", authenticateToken, async (req, res) => {
+  const { season, status, stats } = req.body;
+  try {
+    const foundPlayer = await Player.findById(req.params.playerId);
+
+    for (const stat of stats) {
+      let foundTeam = await Team.findById(stat.team);
+      const foundSeason = foundTeam.seasons.find(
+        (season) => season.season == stat.season
+      );
+
+      if (!foundSeason) {
+        return res.status(404).json;
+      }
+
+      foundSeason.players.push(req.params.playerId);
+
+      await foundTeam.save();
+    }
+
+    foundPlayer.seasons.push({
+      season,
+      status,
+      stats,
+    });
+
+    await foundPlayer.save();
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // POST ROUTES
 
 router.post("/", authenticateToken, async (req, res) => {
-  const { firstName, lastName, seasons } = req.body;
+  const newPlayers = req.body;
 
   try {
-    let existingPlayer = await Player.findOne({ firstName, lastName });
+    const promises = [];
+    for (const newPlayer of newPlayers) {
+      const { firstName, lastName, number, position, seasons } = newPlayer;
+      let existingPlayer = await Player.findOne({ firstName, lastName });
 
-    if (existingPlayer) {
-      return res.status(400).json({ message: "This player already exists" });
-    } else {
-      seasons.forEach((season) => {
-        season.stats.forEach(async (stat) => {
-          const foundTeam = await Team.find(stat.team);
-          stat.team = foundTeam._id;
-        });
-      });
+      if (existingPlayer) {
+        return res.status(400).json({ message: "This player already exists" });
+      }
 
-      const newPlayer = new Player({
-        firstName,
-        lastName,
-        seasons,
-      });
-
-      await newPlayer.save();
-
-      seasons.forEach((playerSeason) => {
-        playerSeason.stats.forEach(async (stat) => {
+      for (const season of seasons) {
+        for (const stat of season.stats) {
           const foundTeam = await Team.findById(stat.team);
-
           if (!foundTeam) {
             return res.status(400).json({ message: "Team not found" });
           }
+          stat.team = foundTeam._id;
+        }
+      }
 
+      const addedPlayer = new Player({
+        firstName,
+        lastName,
+        number,
+        position,
+        seasons,
+      });
+
+      await addedPlayer.save();
+
+      for (const playerSeason of seasons) {
+        for (const stat of playerSeason.stats) {
+          const foundTeam = await Team.findById(stat.team);
+          if (!foundTeam) {
+            return res.status(400).json({ message: "Team not found" });
+          }
           const foundSeason = foundTeam.seasons.find(
             (season) => season.season === playerSeason.season
           );
-
-          foundSeason.players.push(newPlayer._id);
-
-          await foundTeam.save();
-        });
-      });
-
-      res.status(201).json(newPlayer);
+          if (!foundSeason) {
+            return res.status(400).json({ message: "Season not found" });
+          }
+          foundSeason.players.push(addedPlayer._id);
+          promises.push(foundTeam.save());
+        }
+      }
     }
+
+    // Wait for all teams to be saved
+    await Promise.all(promises);
+
+    res.status(201).json({ message: "Added players" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -138,11 +181,11 @@ router.delete("/:playerId", authenticateToken, getPlayer, async (req, res) => {
           return res.status(400).json({ message: "Team not found" });
         }
 
-        const foundSeason = await foundTeam.seasons.find(
+        const foundSeason = foundTeam.seasons.find(
           (season) => season.season === playerSeason.season
         );
 
-        const playerIndex = await foundSeason.players.findIndex(
+        const playerIndex = foundSeason.players.findIndex(
           (player) => player._id === res.player._id
         );
 
