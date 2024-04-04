@@ -21,4 +21,4 @@ app.use("/api/v1/players", playerRouter);
 app.use("/api/v1/year", yearsRouter);
 app.use("/api/v1/users", loginRouter);
 
-app.listen(3000, () => console.log("Server started"));
+app.listen(5000, () => console.log("Server started"));

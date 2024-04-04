@@ -65,14 +65,14 @@ router.patch("/:leagueId", authenticateToken, async (req, res) => {
 
 // update a league to add more seasons if necessary
 router.patch("/addSeason/:leagueId", authenticateToken, async (req, res) => {
-  const { season, status, teams, fixtures } = req.body;
+  const { season, status, fixtures } = req.body;
   let updatedLeague;
-  let foundTeams = [];
+  let newTable = [];
   try {
     if (teams.length > 0) {
       teams.forEach(async (team) => {
         const foundTeam = await Team.findById(team);
-        foundTeams.push(foundTeam._id);
+        newTable.push(foundTeam._id);
       });
     }
 
@@ -81,7 +81,7 @@ router.patch("/addSeason/:leagueId", authenticateToken, async (req, res) => {
         league.seasons.push({
           season,
           status,
-          teams: foundTeams,
+          table: newTable,
           fixtures,
         });
         league.save();
@@ -94,7 +94,7 @@ router.patch("/addSeason/:leagueId", authenticateToken, async (req, res) => {
   }
 });
 
-// update a season to add more fixtures if necessary
+// update a seasons information
 router.patch(
   "/:leagueId/:seasonId",
   authenticateToken,
@@ -104,14 +104,22 @@ router.patch(
     const updatedseason = req.body;
 
     try {
-      const yearIndex = res.league.seasons.findIndex(
+      const seasonIndex = res.league.seasons.findIndex(
         (season) => season.id === seasonId
       );
-      if (yearIndex === -1) {
+      if (seasonIndex === -1) {
         return res.status(404).send("League not found");
       }
 
-      res.league.seasons[yearIndex] = updatedseason;
+      for (let i = 0; i > updatedseason.table.length; i++) {
+        const foundTeam = await Team.findById(updatedseason.table[i].team);
+
+        updatedseason.table[i].team = foundTeam._id;
+      }
+
+      console.log(updatedseason);
+
+      res.league.seasons[seasonIndex] = updatedseason;
       res.league.save();
 
       res.status(201).json(res.league);

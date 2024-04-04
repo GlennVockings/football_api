@@ -25,16 +25,25 @@ const fixturesSchema = new Schema({
   events: [eventSchema],
 });
 
+const tableSchema = new Schema({
+  team: {
+    type: Schema.Types.ObjectId,
+    ref: "Team",
+  },
+  played: Number,
+  wins: Number,
+  loses: Number,
+  draws: Number,
+  for: Number,
+  against: Number,
+  points: Number,
+});
+
 const seasonSchema = new Schema({
   season: String,
   status: String,
-  teams: [
-    {
-      type: Schema.Types.ObjectId,
-      ref: "Team",
-    },
-  ],
   fixtures: [fixturesSchema],
+  table: [tableSchema],
 });
 
 const leagueSchema = new Schema({
