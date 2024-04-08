@@ -7,6 +7,7 @@ const teamsRouter = require("./routes/teams");
 const playerRouter = require("./routes/player");
 const yearsRouter = require("./routes/year");
 const loginRouter = require("./routes/login");
+const summaryRouter = require("./routes/summary");
 
 mongoose.connect(process.env.MONGODB_URI);
 const db = mongoose.connection;
@@ -20,5 +21,6 @@ app.use("/api/v1/teams", teamsRouter);
 app.use("/api/v1/players", playerRouter);
 app.use("/api/v1/year", yearsRouter);
 app.use("/api/v1/users", loginRouter);
+app.use("/api/v1/summary", summaryRouter);
 
 app.listen(5000, () => console.log("Server started"));
