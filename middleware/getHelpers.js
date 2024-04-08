@@ -22,10 +22,10 @@ async function getTeam(req, res, next) {
 async function getLeague(req, res, next) {
   let league;
   try {
-    league = await League.findById(req.params.leagueId).populate({
-      path: "seasons.teams",
-      select: "name",
-    });
+    league = await League.findById(req.params.leagueId).populate(
+      "seasons.table.team",
+      "name"
+    );
     if (league == null) {
       return res.status(404).json({ message: "Cannot find league" });
     }

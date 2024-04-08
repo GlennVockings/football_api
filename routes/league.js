@@ -3,6 +3,7 @@ const router = express.Router();
 const League = require("../models/league");
 const { authenticateToken } = require("../middleware/auth");
 const { getLeague } = require("../middleware/getHelpers");
+const { updateTableData } = require("../helper/helpers");
 
 // GET ROUTES
 
@@ -117,8 +118,6 @@ router.patch(
         updatedseason.table[i].team = foundTeam._id;
       }
 
-      console.log(updatedseason);
-
       res.league.seasons[seasonIndex] = updatedseason;
       res.league.save();
 
@@ -130,40 +129,43 @@ router.patch(
 );
 
 // update a fixture
-router.patch(
-  "/:leagueId/:seasonId/:fixtureId",
-  authenticateToken,
-  getLeague,
-  (req, res) => {
+router.patch("/:leagueId/:seasonId/:fixtureId", getLeague, (req, res) => {
+  try {
     const seasonId = req.params.seasonId;
     const fixtureId = req.params.fixtureId;
     const updatedFixtureData = req.body;
 
-    try {
-      const seasonIndex = res.league.seasons.findIndex(
-        (season) => season.id === seasonId
-      );
-      if (seasonIndex === -1) {
-        return res.status(404).send("League not found");
-      }
-
-      const fixtureIndex = res.league.seasons[seasonIndex].fixtures.findIndex(
-        (fixture) => fixture.id === fixtureId
-      );
-      if (fixtureIndex === -1) {
-        return res.status(404).send("Fixture not found");
-      }
-
-      res.league.seasons[seasonIndex].fixtures[fixtureIndex] =
-        updatedFixtureData;
-
-      const newLeague = res.league.save();
-      res.status(201).json(newLeague);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+    const seasonIndex = res.league.seasons.findIndex(
+      (season) => season.id === seasonId
+    );
+    if (seasonIndex === -1) {
+      return res.status(404).send("League not found");
     }
+
+    const fixtureIndex = res.league.seasons[seasonIndex].fixtures.findIndex(
+      (fixture) => fixture.id === fixtureId
+    );
+
+    if (fixtureIndex === -1) {
+      return res.status(404).send("Fixture not found");
+    }
+
+    res.league.seasons[seasonIndex].fixtures[fixtureIndex] = updatedFixtureData;
+
+    const updatedTable = updateTableData(
+      res.league.seasons[seasonIndex].fixtures,
+      res.league.seasons[seasonIndex].table
+    );
+
+    res.league.seasons[seasonIndex].table = updatedTable;
+
+    const newLeague = res.league.save();
+
+    res.status(201).json(newLeague);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
-);
+});
 
 // POST ROUTES
 

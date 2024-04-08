@@ -22,6 +22,10 @@ const fixturesSchema = new Schema({
   dateTime: String,
   venue: String,
   status: String,
+  score: {
+    home: Number,
+    away: Number,
+  },
   events: [eventSchema],
 });
 
@@ -30,13 +34,42 @@ const tableSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: "Team",
   },
-  played: Number,
-  wins: Number,
-  loses: Number,
-  draws: Number,
-  for: Number,
-  against: Number,
-  points: Number,
+  played: {
+    type: Number,
+    default: 0,
+  },
+  wins: {
+    type: Number,
+    default: 0,
+  },
+  loses: {
+    type: Number,
+    default: 0,
+  },
+  draws: {
+    type: Number,
+    default: 0,
+  },
+  for: {
+    type: Number,
+    default: 0,
+  },
+  against: {
+    type: Number,
+    default: 0,
+  },
+  points: {
+    type: Number,
+    default: 0,
+  },
+  yellowCards: {
+    type: Number,
+    default: 0,
+  },
+  redCards: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const seasonSchema = new Schema({

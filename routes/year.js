@@ -3,7 +3,7 @@ const router = express.Router();
 const League = require("../models/league");
 const Team = require("../models/team");
 const Player = require("../models/player");
-const generateFixtures = require("../helper/helpers");
+const { generateFixtures } = require("../helper/helpers");
 
 router.patch("/generateFixtures", async (req, res) => {
   try {
