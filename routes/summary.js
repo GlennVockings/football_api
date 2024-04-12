@@ -3,24 +3,40 @@ const router = express.Router();
 const League = require("../models/league");
 const { authenticateToken } = require("../middleware/auth");
 
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    const leagues = await League.aggregate([
-      // Unwind the seasons array to get each season as a separate document
-      { $unwind: "$seasons" },
-      // Match seasons with status "On going"
-      { $match: { "seasons.status": "On going" } },
-      // Group by league id and select the latest season
-      {
-        $group: {
-          _id: "$_id",
-          league: { $first: "$league" },
-          latestSeason: { $last: "$seasons" },
-        },
-      },
-    ]);
+    // Find leagues with ongoing seasons
+    const leagues = await League.find().populate({
+      path: "seasons.table.team",
+      select: "name",
+    });
 
-    res.json(leagues);
+    const filteredLeagues = leagues.map((league) => {
+      const seasonIndex = league.seasons.findIndex(
+        (season) => season.status === "Completed"
+      );
+
+      league.seasons.splice(seasonIndex, 1);
+
+      // Filter out fixtures with empty or undefined dateTime values
+      const completedFixtures = league.seasons[0].fixtures
+        .filter((fixture) => fixture.status === "completed" && fixture.dateTime)
+        .sort((a, b) => {
+          // Convert dateTime strings to Date objects for comparison
+          const dateA = new Date(a.dateTime);
+          const dateB = new Date(b.dateTime);
+          // Sort by dateTime in descending order
+          return dateB - dateA;
+        })
+        .slice(0, 7); // Select the first 7 fixtures
+
+      // Replace fixtures array with the last 7 completed fixtures
+      league.seasons[0].fixtures = completedFixtures;
+
+      return league; // Need to return the modified league object
+    });
+
+    res.json(filteredLeagues);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

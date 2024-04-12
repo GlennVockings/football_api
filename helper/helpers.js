@@ -37,21 +37,22 @@ function generateFixtures(teams) {
 }
 
 function updateTableData(fixtures, table) {
-  // resets the table stats
+  // Resets the table stats
   for (let row in table) {
     table[row].played = 0;
-    table[row].wins;
-    table[row].loses;
-    table[row].draws;
-    table[row].for;
-    table[row].against;
-    table[row].points;
-    table[row].yellowCards;
-    table[row].redCards;
+    table[row].wins = 0;
+    table[row].loses = 0;
+    table[row].draws = 0;
+    table[row].for = 0;
+    table[row].against = 0;
+    table[row].points = 0;
+    table[row].yellowCards = 0;
+    table[row].redCards = 0;
   }
 
-  for (let fixture in fixtures) {
-    const { home, away, score, events, status } = fixtures[fixture];
+  // Update table data based on fixtures
+  for (let fixture of fixtures) {
+    const { home, away, score, events, status } = fixture;
 
     if (status !== "completed") {
       continue;
@@ -61,27 +62,28 @@ function updateTableData(fixtures, table) {
     const awayTable = table.find((row) => row.team.name === away);
 
     homeTable.played++;
-    homeTable.for = +score.home;
-    homeTable.against = +score.away;
-    awayTable.for = +score.away;
-    awayTable.against = +score.home;
+    awayTable.played++;
+    homeTable.for += +score.home;
+    homeTable.against += +score.away;
+    awayTable.for += +score.away;
+    awayTable.against += +score.home;
 
-    if (score.home > score.away) {
+    if (+score.home > +score.away) {
       homeTable.wins++;
-      homeTable.points = +3;
+      homeTable.points += 3;
       awayTable.loses++;
-    } else if (score.home < score.away) {
+    } else if (+score.home < +score.away) {
       homeTable.loses++;
       awayTable.wins++;
-      awayTable.points = +3;
+      awayTable.points += 3;
     } else {
       homeTable.draws++;
-      homeTable.points = +1;
+      homeTable.points++;
       awayTable.draws++;
-      awayTable.points = +1;
+      awayTable.points++;
     }
 
-    for (let event in events) {
+    for (let event of events) {
       switch (event.type) {
         case "goal":
           continue;
@@ -91,17 +93,34 @@ function updateTableData(fixtures, table) {
           } else {
             awayTable.yellowCards++;
           }
+          break;
         case "redCard":
           if (event.team === home) {
             homeTable.redCards++;
           } else {
             awayTable.redCards++;
           }
+          break;
         default:
           continue;
       }
     }
   }
+
+  // Sort table by points, goal difference, and then by highest 'for'
+  table.sort((a, b) => {
+    if (a.points !== b.points) {
+      return b.points - a.points; // Sort by points descending
+    } else {
+      const goalDifferenceA = a.for - a.against;
+      const goalDifferenceB = b.for - b.against;
+      if (goalDifferenceA !== goalDifferenceB) {
+        return goalDifferenceB - goalDifferenceA; // Sort by goal difference descending
+      } else {
+        return b.for - a.for; // Sort by 'for' (goals scored) descending
+      }
+    }
+  });
 
   return table;
 }
