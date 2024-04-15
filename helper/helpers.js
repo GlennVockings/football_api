@@ -109,17 +109,15 @@ function updateTableData(fixtures, table) {
 
   // Sort table by points, goal difference, and then by highest 'for'
   table.sort((a, b) => {
-    if (a.points !== b.points) {
-      return b.points - a.points; // Sort by points descending
-    } else {
-      const goalDifferenceA = a.for - a.against;
-      const goalDifferenceB = b.for - b.against;
-      if (goalDifferenceA !== goalDifferenceB) {
-        return goalDifferenceB - goalDifferenceA; // Sort by goal difference descending
-      } else {
-        return b.for - a.for; // Sort by 'for' (goals scored) descending
-      }
+    if (b.points !== a.points) {
+      return b.points - a.points;
     }
+    const goalDifferenceA = a.for - a.against;
+    const goalDifferenceB = b.for - b.against;
+    if (goalDifferenceB !== goalDifferenceA) {
+      return goalDifferenceB - goalDifferenceA;
+    }
+    return a.team.name.localeCompare(b.team.name);
   });
 
   return table;

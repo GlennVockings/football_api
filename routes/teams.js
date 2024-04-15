@@ -8,7 +8,7 @@ const { getTeam } = require("../middleware/getHelpers");
 const player = require("../models/player");
 
 // Gets all teams
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const teams = await Team.find().populate("seasons.league", "league");
 
@@ -18,8 +18,18 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/summary", async (req, res) => {
+  try {
+    const teams = await Team.find().select("_id name");
+
+    res.status(201).json(teams);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Get specific team
-router.get("/:teamId", authenticateToken, getTeam, async (req, res) => {
+router.get("/:teamId", getTeam, async (req, res) => {
   try {
     const teamName = res.team.name;
 

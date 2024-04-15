@@ -36,7 +36,17 @@ router.get("/", async (req, res) => {
       return league; // Need to return the modified league object
     });
 
-    res.json(filteredLeagues);
+    res.status(201).json(filteredLeagues);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/leagues", async (req, res) => {
+  try {
+    const leagues = await League.find().select("_id league");
+
+    res.status(201).json(leagues);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

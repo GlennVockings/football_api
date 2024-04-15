@@ -8,9 +8,19 @@ const { updateTableData } = require("../helper/helpers");
 // GET ROUTES
 
 // get all fixtures
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const leagues = await League.find();
+    res.status(201).json(leagues);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/summary", async (req, res) => {
+  try {
+    const leagues = await League.find().select("_id league");
+
     res.status(201).json(leagues);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -25,20 +35,35 @@ router.get("/:leagueId", getLeague, (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-// get a specific league's fixtures
-router.get("/:leagueId/:seasonId", authenticateToken, getLeague, (req, res) => {
-  const seasonId = req.params.seasonId;
-
+router.get("/:leagueId/summary", getLeague, (req, res) => {
   try {
-    const seasonData = res.league.seasons.find(
-      (season) => season.id === seasonId
+    const filteredSeason = res.league.seasons.find(
+      (season) => season.status === "On going"
     );
-    if (!seasonData) {
-      return res.status(404).send("League not found");
+
+    if (!filteredSeason) {
+      // If no ongoing season is found, return an empty array of completed fixtures
+      return res.status(200).json({ message: "No ongoing season found" });
     }
 
-    res.status(201).json(seasonData);
+    // Filter out fixtures with empty or undefined dateTime values
+    const completedFixtures = filteredSeason.fixtures
+      .filter((fixture) => fixture.status === "completed" && fixture.dateTime)
+      .sort((a, b) => b.dateTime - a.dateTime)
+      .slice(0, 7); // Select the first 7 fixtures
+
+    const slimTable = filteredSeason.table.slice(0, 5);
+
+    const summary = {
+      season: filteredSeason.season,
+      status: filteredSeason.status,
+      fixtures: filteredSeason.fixtures,
+      table: filteredSeason.table,
+      completedFixtures: completedFixtures,
+      slimTable: slimTable,
+    };
+
+    res.status(200).json(summary);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
