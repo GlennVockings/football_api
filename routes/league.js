@@ -20,22 +20,13 @@ router.get("/", async (req, res) => {
 router.get("/summary", async (req, res) => {
   try {
     const leagues = await League.find().select("_id league");
-
-    res.status(201).json(leagues);
+    return res.status(201).json(leagues);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// get league info
 router.get("/:leagueId", getLeague, (req, res) => {
-  try {
-    res.status(201).json(res.league);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-router.get("/:leagueId/summary", getLeague, (req, res) => {
   try {
     const filteredSeason = res.league.seasons.find(
       (season) => season.status === "On going"
@@ -54,6 +45,42 @@ router.get("/:leagueId/summary", getLeague, (req, res) => {
 
     const slimTable = filteredSeason.table.slice(0, 5);
 
+    // Sort top three teams for goals
+    const topThreeGoals = filteredSeason.table
+      .slice(0, 3)
+      .sort(
+        (a, b) =>
+          b.for - a.for ||
+          (a.team && b.team && a.team.name.localeCompare(b.team.name))
+      )
+      .map((team) => ({ team: team.team && team.team.name, stat: team.for }));
+
+    // Sort top three teams for yellow cards
+    const topThreeYellowCards = filteredSeason.table
+      .sort(
+        (a, b) =>
+          b.yellowCards - a.yellowCards ||
+          (a.team && b.team && a.team.name.localeCompare(b.team.name))
+      )
+      .slice(0, 3)
+      .map((team) => ({
+        team: team.team && team.team.name,
+        stat: team.yellowCards,
+      }));
+
+    // Sort top three teams for red cards
+    const topThreeRedCards = filteredSeason.table
+      .sort(
+        (a, b) =>
+          b.redCards - a.redCards ||
+          (a.team && b.team && a.team.name.localeCompare(b.team.name))
+      )
+      .slice(0, 3)
+      .map((team) => ({
+        team: team.team && team.team.name,
+        stat: team.redCards,
+      }));
+
     const summary = {
       season: filteredSeason.season,
       status: filteredSeason.status,
@@ -61,9 +88,45 @@ router.get("/:leagueId/summary", getLeague, (req, res) => {
       table: filteredSeason.table,
       completedFixtures: completedFixtures,
       slimTable: slimTable,
+      stats: [
+        { name: "Goals", stats: topThreeGoals },
+        { name: "Yellow Cards", stats: topThreeYellowCards },
+        { name: "Red Cards", stats: topThreeRedCards },
+      ],
     };
 
-    res.status(200).json(summary);
+    return res.status(200).json(summary);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/:leagueId/upcomingFixtures", getLeague, (req, res) => {
+  try {
+    const foundSeason = res.league.seasons.find(
+      (season) => season.status === "On going"
+    );
+
+    if (!foundSeason) {
+      // If no ongoing season is found, return an empty array of completed fixtures
+      return res.status(200).json({ message: "No ongoing season found" });
+    }
+
+    const filteredSeason = foundSeason.fixtures.filter(
+      (fixture) => fixture.status !== "completed" && fixture.dateTime != ""
+    );
+
+    if (filteredSeason.length < 1) {
+      return res.status(201).json({ message: "No Upcoming fixtures" });
+    }
+
+    filteredSeason.sort((a, b) => {
+      const dateA = new Date(a.dateTime);
+      const dateB = new Date(b.dateTime);
+      return dateA - dateB;
+    });
+
+    res.status(200).json(filteredSeason);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -176,6 +239,12 @@ router.patch("/:leagueId/:seasonId/:fixtureId", getLeague, (req, res) => {
     }
 
     res.league.seasons[seasonIndex].fixtures[fixtureIndex] = updatedFixtureData;
+
+    res.league.seasons[seasonIndex].fixtures.sort((a, b) => {
+      const dateA = new Date(a.dateTime);
+      const dateB = new Date(b.dateTime);
+      return dateA - dateB;
+    });
 
     const updatedTable = updateTableData(
       res.league.seasons[seasonIndex].fixtures,
