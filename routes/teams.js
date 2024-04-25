@@ -10,8 +10,41 @@ const player = require("../models/player");
 // Gets all teams
 router.get("/", async (req, res) => {
   try {
-    const teams = await Team.find().populate("seasons.league", "league");
+    const teamName = req.query.team;
 
+    if (teamName) {
+      const team = await Team.findOne({ name: teamName }).populate(
+        "league",
+        "league"
+      );
+      // Aggregate to find fixtures where the team is either home or away
+      const fixtures = await League.aggregate([
+        { $unwind: "$seasons" },
+        { $unwind: "$seasons.fixtures" },
+        {
+          $match: {
+            $or: [
+              { "seasons.fixtures.home": teamName },
+              { "seasons.fixtures.away": teamName },
+            ],
+          },
+        },
+        {
+          $group: {
+            _id: "$seasons.season",
+            fixtures: { $push: "$seasons.fixtures" },
+          },
+        },
+        { $project: { _id: 0, season: "$_id", fixtures: 1 } },
+      ]);
+
+      return res.status(200).json({
+        team,
+        fixtures: fixtures,
+      });
+    }
+
+    const teams = await Team.find().populate("seasons.league", "league");
     res.status(200).json(teams);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -20,7 +53,7 @@ router.get("/", async (req, res) => {
 
 router.get("/summary", async (req, res) => {
   try {
-    const teams = await Team.find().select("_id name");
+    const teams = await Team.find().sort({ name: "asc" }).select("_id name");
 
     res.status(201).json(teams);
   } catch (err) {
@@ -31,33 +64,7 @@ router.get("/summary", async (req, res) => {
 // Get specific team
 router.get("/:teamId", getTeam, async (req, res) => {
   try {
-    const teamName = res.team.name;
-
-    // Aggregate to find fixtures where the team is either home or away
-    const fixtures = await League.aggregate([
-      { $unwind: "$seasons" },
-      { $unwind: "$seasons.fixtures" },
-      {
-        $match: {
-          $or: [
-            { "seasons.fixtures.home": teamName },
-            { "seasons.fixtures.away": teamName },
-          ],
-        },
-      },
-      {
-        $group: {
-          _id: "$seasons.season",
-          fixtures: { $push: "$seasons.fixtures" },
-        },
-      },
-      { $project: { _id: 0, season: "$_id", fixtures: 1 } },
-    ]);
-
-    res.status(200).json({
-      team: res.team,
-      fixtures: fixtures,
-    });
+    res.status(200).json(res.team);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -155,7 +162,18 @@ router.post("/", authenticateToken, async (req, res) => {
           (season) => season.season === teamSeason
         );
 
-        currentSeason.teams.push(team._id);
+        const tableTemplate = {
+          team: team._id,
+          played: 0,
+          wins: 0,
+          loses: 0,
+          draws: 0,
+          for: 0,
+          against: 0,
+          points: 0,
+        };
+
+        currentSeason.table.push(tableTemplate);
 
         await foundLeague.save();
       }

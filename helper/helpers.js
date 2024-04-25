@@ -123,4 +123,8 @@ function updateTableData(fixtures, table) {
   return table;
 }
 
-module.exports = { generateFixtures, updateTableData };
+function capitalizeFirstLetter(str) {
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+module.exports = { generateFixtures, updateTableData, capitalizeFirstLetter };

@@ -20,21 +20,26 @@ async function getTeam(req, res, next) {
 }
 
 async function getLeague(req, res, next) {
-  let league;
   try {
-    league = await League.findById(req.params.leagueId).populate(
-      "seasons.table.team",
-      "name"
-    );
-    if (league == null) {
+    let league = await League.findById(req.params.leagueId).populate([
+      { path: "seasons.table.team", model: "Team", select: "name" }, // Populating seasons.table.team with name
+      { path: "seasons.teams", select: "name ground" }, // Populating teams array with name and ground fields
+    ]);
+
+    if (!league) {
       return res.status(404).json({ message: "Cannot find league" });
     }
+
+    // Sort teams array by name
+    league.seasons.forEach((season) => {
+      season.teams.sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    res.league = league;
+    next();
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
-
-  res.league = league;
-  next();
 }
 
 async function getPlayer(req, res, next) {

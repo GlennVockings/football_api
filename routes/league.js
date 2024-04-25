@@ -1,17 +1,42 @@
 const express = require("express");
 const router = express.Router();
 const League = require("../models/league");
+const Team = require("../models/team");
 const { authenticateToken } = require("../middleware/auth");
 const { getLeague } = require("../middleware/getHelpers");
-const { updateTableData } = require("../helper/helpers");
+const { updateTableData, capitalizeFirstLetter } = require("../helper/helpers");
 
 // GET ROUTES
 
 // get all fixtures
 router.get("/", async (req, res) => {
   try {
-    const leagues = await League.find();
-    res.status(201).json(leagues);
+    const leagueName = req.query.league;
+
+    if (leagueName) {
+      const formattedLeague = capitalizeFirstLetter(
+        leagueName.replace("-", " ")
+      );
+
+      let league = await League.findOne({ league: formattedLeague }).populate([
+        { path: "seasons.table.team", model: "Team", select: "name" }, // Populating seasons.table.team with name
+        { path: "seasons.teams", select: "name ground" }, // Populating teams array with name and ground fields
+      ]);
+
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      return res.status(200).json(league);
+    }
+
+    const leagues = await League.find()
+      .populate([
+        { path: "seasons.table.team", model: "Team", select: "name" }, // Populating seasons.table.team with name
+        { path: "seasons.teams", select: "name ground" }, // Populating teams array with name and ground fields
+      ])
+      .lean();
+    res.status(200).json(leagues);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -27,6 +52,14 @@ router.get("/summary", async (req, res) => {
 });
 
 router.get("/:leagueId", getLeague, (req, res) => {
+  try {
+    res.status(201).json(res.league);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/:leagueId/summary", getLeague, (req, res) => {
   try {
     const filteredSeason = res.league.seasons.find(
       (season) => season.status === "On going"
@@ -190,24 +223,38 @@ router.patch(
   getLeague,
   async (req, res) => {
     const seasonId = req.params.seasonId;
-    const updatedseason = req.body;
+    const { season, status, fixtures, table, teams } = req.body;
 
     try {
+      let teamsArray = [];
       const seasonIndex = res.league.seasons.findIndex(
         (season) => season.id === seasonId
       );
       if (seasonIndex === -1) {
-        return res.status(404).send("League not found");
+        return res.status(404).send("Season not found");
       }
 
-      for (let i = 0; i > updatedseason.table.length; i++) {
-        const foundTeam = await Team.findById(updatedseason.table[i].team);
+      for (let i = 0; i < teams.length; i++) {
+        const foundTeam = await Team.findById(teams[i]);
 
-        updatedseason.table[i].team = foundTeam._id;
+        if (!foundTeam) {
+          return res.status(404).send(`Team with ID ${teams[i]} not found`);
+        }
+
+        teamsArray.push(foundTeam._id);
+        table.team = foundTeam._id;
       }
 
-      res.league.seasons[seasonIndex] = updatedseason;
-      res.league.save();
+      console.log(teamsArray);
+
+      res.league.seasons[seasonIndex] = {
+        season,
+        status,
+        fixtures,
+        table,
+        teams: teamsArray,
+      };
+      await res.league.save();
 
       res.status(201).json(res.league);
     } catch (err) {

@@ -77,6 +77,12 @@ const seasonSchema = new Schema({
   status: String,
   fixtures: [fixturesSchema],
   table: [tableSchema],
+  teams: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Team",
+    },
+  ],
 });
 
 const leagueSchema = new Schema({
