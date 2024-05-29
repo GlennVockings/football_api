@@ -6,46 +6,59 @@ const Player = require("../models/player");
 const { authenticateToken } = require("../middleware/auth");
 const { getTeam } = require("../middleware/getHelpers");
 const player = require("../models/player");
+const { capitalizeFirstLetter } = require("../helper/helpers");
 
 // Gets all teams
 router.get("/", async (req, res) => {
   try {
     const teamName = req.query.team;
+    const year = req.query.year;
 
-    if (teamName) {
-      const team = await Team.findOne({ name: teamName }).populate(
-        "league",
-        "league"
-      );
-      // Aggregate to find fixtures where the team is either home or away
-      const fixtures = await League.aggregate([
-        { $unwind: "$seasons" },
-        { $unwind: "$seasons.fixtures" },
-        {
-          $match: {
-            $or: [
-              { "seasons.fixtures.home": teamName },
-              { "seasons.fixtures.away": teamName },
-            ],
-          },
-        },
-        {
-          $group: {
-            _id: "$seasons.season",
-            fixtures: { $push: "$seasons.fixtures" },
-          },
-        },
-        { $project: { _id: 0, season: "$_id", fixtures: 1 } },
-      ]);
-
-      return res.status(200).json({
-        team,
-        fixtures: fixtures,
-      });
+    if (!teamName || !year) {
+      return res
+        .status(400)
+        .json({ message: "Team name and year are required query parameters" });
     }
 
-    const teams = await Team.find().populate("seasons.league", "league");
-    res.status(200).json(teams);
+    const formattedTeam = capitalizeFirstLetter(teamName.replace("-", " "));
+
+    const team = await Team.findOne({ name: formattedTeam }).populate(
+      "seasons.league",
+      "league"
+    );
+
+    if (!team) {
+      return res.status(404).json({ message: "Team not found" });
+    }
+
+    const foundSeason = team.seasons.find((season) => season.season === year);
+
+    if (!foundSeason) {
+      return res
+        .status(404)
+        .json({ message: `Season ${year} not found for the team` });
+    }
+
+    const leagueId = foundSeason.league; // Assuming league is stored as ObjectId in season
+
+    const foundLeague = await League.findById(leagueId);
+    const foundLeagueSeason = foundLeague.seasons.filter(
+      (season) => season.season === year
+    );
+
+    const fixtures = foundLeagueSeason[0].fixtures.filter(
+      (fixture) =>
+        (fixture.home === team.name && fixture.status !== "") ||
+        (fixture.away === team.name && fixture.status !== "")
+    );
+
+    return res.status(200).json({
+      name: team.name,
+      parent: team.parent,
+      ground: team.ground,
+      season: foundSeason,
+      fixtures,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -53,7 +66,9 @@ router.get("/", async (req, res) => {
 
 router.get("/summary", async (req, res) => {
   try {
-    const teams = await Team.find().sort({ name: "asc" }).select("_id name");
+    const teams = await Team.find()
+      .sort({ name: "asc" })
+      .select("_id name parent abbr");
 
     res.status(201).json(teams);
   } catch (err) {
@@ -71,14 +86,16 @@ router.get("/:teamId", getTeam, async (req, res) => {
 });
 
 // updates team information
-router.patch("/:teamId", authenticateToken, async (req, res) => {
-  const { name, ground } = req.body;
+router.patch("/:teamId", async (req, res) => {
+  const { name, ground, parent, abbr } = req.body;
   const teamId = req.params.teamId;
   let foundTeam;
   try {
     foundTeam = await Team.findById(teamId).then((team) => {
       team.name = name;
       team.ground = ground;
+      team.parent = parent;
+      team.abbr = abbr;
       team.save();
     });
 

@@ -13,6 +13,21 @@ router.get("/", async (req, res) => {
   try {
     const leagueName = req.query.league;
 
+    // Function to compute top three stats
+    const computeTopThreeStats = (table, statField) => {
+      return table
+        .sort(
+          (a, b) =>
+            b[statField] - a[statField] ||
+            (a.team && b.team && a.team.name.localeCompare(b.team.name))
+        )
+        .slice(0, 3)
+        .map((team) => ({
+          team: team.team && team.team.name,
+          stat: team[statField],
+        }));
+    };
+
     if (leagueName) {
       const formattedLeague = capitalizeFirstLetter(
         leagueName.replace("-", " ")
@@ -27,16 +42,72 @@ router.get("/", async (req, res) => {
         return res.status(404).json({ message: "League not found" });
       }
 
+      // Convert the league document to a plain object
+      league = league.toObject();
+
+      // Compute stats for each season
+      league.seasons = league.seasons.map((season) => {
+        const topThreeGoals = computeTopThreeStats(season.table, "for");
+        const topThreeYellowCards = computeTopThreeStats(
+          season.table,
+          "yellowCards"
+        );
+        const topThreeRedCards = computeTopThreeStats(season.table, "redCards");
+        const topThreeCleanSheets = computeTopThreeStats(
+          season.table,
+          "cleanSheets"
+        );
+
+        return {
+          ...season,
+          stats: [
+            { name: "Goals", stats: topThreeGoals },
+            { name: "Yellow Cards", stats: topThreeYellowCards },
+            { name: "Red Cards", stats: topThreeRedCards },
+            { name: "Clean Sheets", stats: topThreeCleanSheets },
+          ],
+        };
+      });
+
       return res.status(200).json(league);
     }
 
     const leagues = await League.find()
       .populate([
         { path: "seasons.table.team", model: "Team", select: "name" }, // Populating seasons.table.team with name
-        { path: "seasons.teams", select: "name ground" }, // Populating teams array with name and ground fields
+        { path: "seasons.teams", select: "name ground abbr parent" }, // Populating teams array with name and ground fields
       ])
       .lean();
-    res.status(200).json(leagues);
+
+    // Compute stats for each season in all leagues
+    const leaguesWithStats = leagues.map((league) => {
+      league.seasons = league.seasons.map((season) => {
+        const topThreeGoals = computeTopThreeStats(season.table, "for");
+        const topThreeYellowCards = computeTopThreeStats(
+          season.table,
+          "yellowCards"
+        );
+        const topThreeRedCards = computeTopThreeStats(season.table, "redCards");
+        const topThreeCleanSheets = computeTopThreeStats(
+          season.table,
+          "cleanSheets"
+        );
+
+        return {
+          ...season,
+          stats: [
+            { name: "Goals", stats: topThreeGoals },
+            { name: "Yellow Cards", stats: topThreeYellowCards },
+            { name: "Red Cards", stats: topThreeRedCards },
+            { name: "Clean Sheets", stats: topThreeCleanSheets },
+          ],
+        };
+      });
+
+      return league;
+    });
+
+    res.status(200).json(leaguesWithStats);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -78,17 +149,27 @@ router.get("/:leagueId/summary", getLeague, (req, res) => {
 
     const slimTable = filteredSeason.table.slice(0, 5);
 
-    // Sort top three teams for goals
+    let upcomingFixtures = filteredSeason.fixtures.filter(
+      (fixture) => fixture.status !== "completed" && fixture.dateTime != ""
+    );
+
+    upcomingFixtures.sort((a, b) => {
+      const dateA = new Date(a.dateTime);
+      const dateB = new Date(b.dateTime);
+      return dateA - dateB;
+    });
+
+    // Sort and extract top three teams for goals
     const topThreeGoals = filteredSeason.table
-      .slice(0, 3)
       .sort(
         (a, b) =>
           b.for - a.for ||
           (a.team && b.team && a.team.name.localeCompare(b.team.name))
       )
+      .slice(0, 3)
       .map((team) => ({ team: team.team && team.team.name, stat: team.for }));
 
-    // Sort top three teams for yellow cards
+    // Sort and extract top three teams for yellow cards
     const topThreeYellowCards = filteredSeason.table
       .sort(
         (a, b) =>
@@ -101,7 +182,7 @@ router.get("/:leagueId/summary", getLeague, (req, res) => {
         stat: team.yellowCards,
       }));
 
-    // Sort top three teams for red cards
+    // Sort and extract top three teams for red cards
     const topThreeRedCards = filteredSeason.table
       .sort(
         (a, b) =>
@@ -114,17 +195,33 @@ router.get("/:leagueId/summary", getLeague, (req, res) => {
         stat: team.redCards,
       }));
 
+    // Sort and extract top three teams for clean sheets
+    const topThreeCleanSheets = filteredSeason.table
+      .sort(
+        (a, b) =>
+          b.cleanSheets - a.cleanSheets ||
+          (a.team && b.team && a.team.name.localeCompare(b.team.name))
+      )
+      .slice(0, 3)
+      .map((team) => ({
+        team: team.team && team.team.name,
+        stat: team.cleanSheets,
+      }));
+
     const summary = {
       season: filteredSeason.season,
       status: filteredSeason.status,
       fixtures: filteredSeason.fixtures,
       table: filteredSeason.table,
+      teams: filteredSeason.teams,
+      upcomingFixtures: upcomingFixtures,
       completedFixtures: completedFixtures,
       slimTable: slimTable,
       stats: [
         { name: "Goals", stats: topThreeGoals },
         { name: "Yellow Cards", stats: topThreeYellowCards },
         { name: "Red Cards", stats: topThreeRedCards },
+        { name: "Clean Sheets", stats: topThreeCleanSheets },
       ],
     };
 

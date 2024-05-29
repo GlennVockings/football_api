@@ -8,16 +8,16 @@ const { generateFixtures } = require("../helper/helpers");
 router.patch("/generateFixtures", async (req, res) => {
   try {
     const teams = [
-      "Reigate Priory II",
-      "Eastbourne Rangers",
-      "Nutfield",
-      "Crawley AFC",
-      "Barcombe",
-      "Cuckfield Town",
-      "Cuckfield Rangers II",
-      "Peacehaven & Telscombe II",
-      "Lindfield II",
-      "Wivelsfield Green",
+      "Ridgewood",
+      "Godstone",
+      "AFC Varndeanians II",
+      "Polegate Town",
+      "AFC Uckfield Town II",
+      "Hurstpierpoint",
+      "Ringmer AFC II",
+      "DCK",
+      "Sovereign Saints",
+      "West Hoathly",
     ];
     const fixturesJSON = generateFixtures(teams);
     res.status(201).json(fixturesJSON);

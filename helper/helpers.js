@@ -1,39 +1,32 @@
 function generateFixtures(teams) {
   const numTeams = teams.length;
   const fixtures = [];
-  const isOdd = numTeams % 2 !== 0;
 
-  if (isOdd) {
-    teams.push("Ghost Team");
-  }
-
-  const totalRounds = numTeams - 1;
-  const matchesPerRound = numTeams / 2;
-
-  for (let round = 0; round < totalRounds; round++) {
-    const roundFixtures = [];
-    for (let match = 0; match < matchesPerRound; match++) {
-      const homeIndex = match;
-      const awayIndex = (numTeams - 1 + match - round) % (numTeams - 1);
-      const homeTeam = teams[homeIndex];
-      const awayTeam = teams[awayIndex];
-      if (homeTeam !== awayTeam) {
-        roundFixtures.push({
-          home: homeTeam,
-          away: awayTeam,
-          dateTime: "",
-          venue: "",
-          status: "",
-          events: [],
-        });
-      }
+  // Generate fixtures for each team
+  for (let i = 0; i < numTeams; i++) {
+    const homeTeam = teams[i];
+    for (let j = i + 1; j < numTeams; j++) {
+      const awayTeam = teams[j];
+      fixtures.push({
+        home: homeTeam,
+        away: awayTeam,
+        dateTime: "",
+        venue: "",
+        status: "",
+        events: [],
+      });
+      fixtures.push({
+        home: awayTeam,
+        away: homeTeam,
+        dateTime: "",
+        venue: "",
+        status: "",
+        events: [],
+      }); // Add the reverse fixture
     }
-    fixtures.push(roundFixtures);
-
-    teams.splice(1, 0, teams.pop());
   }
 
-  return fixtures.flat();
+  return fixtures;
 }
 
 function updateTableData(fixtures, table) {
@@ -48,6 +41,7 @@ function updateTableData(fixtures, table) {
     table[row].points = 0;
     table[row].yellowCards = 0;
     table[row].redCards = 0;
+    table[row].cleanSheets = 0;
   }
 
   // Update table data based on fixtures
@@ -72,10 +66,16 @@ function updateTableData(fixtures, table) {
       homeTable.wins++;
       homeTable.points += 3;
       awayTable.loses++;
+      if (+score.away === 0) {
+        homeTeam.cleanSheets++;
+      }
     } else if (+score.home < +score.away) {
       homeTable.loses++;
       awayTable.wins++;
       awayTable.points += 3;
+      if (+score.home === 0) {
+        awayTable.cleanSheets++;
+      }
     } else {
       homeTable.draws++;
       homeTable.points++;

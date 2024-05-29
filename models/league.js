@@ -62,14 +62,6 @@ const tableSchema = new Schema({
     type: Number,
     default: 0,
   },
-  yellowCards: {
-    type: Number,
-    default: 0,
-  },
-  redCards: {
-    type: Number,
-    default: 0,
-  },
 });
 
 const seasonSchema = new Schema({
