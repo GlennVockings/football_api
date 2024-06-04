@@ -29,7 +29,7 @@ const seasonSchema = new Schema({
   },
   players: [{ type: Schema.Types.ObjectId, ref: "Player" }],
   manager: String,
-  stats: [statsSchema],
+  stats: statsSchema,
 });
 
 const teamSchema = new Schema({

@@ -6,65 +6,19 @@ const Player = require("../models/player");
 const { authenticateToken } = require("../middleware/auth");
 const { getTeam } = require("../middleware/getHelpers");
 const player = require("../models/player");
-const { capitalizeFirstLetter } = require("../helper/helpers");
 
 // Gets all teams
 router.get("/", async (req, res) => {
   try {
-    const teamName = req.query.team;
-    const year = req.query.year;
+    const teams = await Team.find();
 
-    if (!teamName || !year) {
-      return res
-        .status(400)
-        .json({ message: "Team name and year are required query parameters" });
-    }
-
-    const formattedTeam = capitalizeFirstLetter(teamName.replace("-", " "));
-
-    const team = await Team.findOne({ name: formattedTeam }).populate(
-      "seasons.league",
-      "league"
-    );
-
-    if (!team) {
-      return res.status(404).json({ message: "Team not found" });
-    }
-
-    const foundSeason = team.seasons.find((season) => season.season === year);
-
-    if (!foundSeason) {
-      return res
-        .status(404)
-        .json({ message: `Season ${year} not found for the team` });
-    }
-
-    const leagueId = foundSeason.league; // Assuming league is stored as ObjectId in season
-
-    const foundLeague = await League.findById(leagueId);
-    const foundLeagueSeason = foundLeague.seasons.filter(
-      (season) => season.season === year
-    );
-
-    const fixtures = foundLeagueSeason[0].fixtures.filter(
-      (fixture) =>
-        (fixture.home === team.name && fixture.status !== "") ||
-        (fixture.away === team.name && fixture.status !== "")
-    );
-
-    return res.status(200).json({
-      name: team.name,
-      parent: team.parent,
-      ground: team.ground,
-      season: foundSeason,
-      fixtures,
-    });
+    return res.status(200).json(teams);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.get("/summary", async (req, res) => {
+router.get("/list", async (req, res) => {
   try {
     const teams = await Team.find()
       .sort({ name: "asc" })
@@ -150,7 +104,7 @@ router.patch("/addSeason/:teamId", authenticateToken, async (req, res) => {
 
 // add a new team
 router.post("/", authenticateToken, async (req, res) => {
-  const { name, ground, seasons } = req.body;
+  const { name, ground, parent, seasons } = req.body;
 
   try {
     let existingTeam = await Team.findOne({ name });
@@ -164,6 +118,7 @@ router.post("/", authenticateToken, async (req, res) => {
       const team = new Team({
         name,
         ground,
+        parent,
         seasons,
       });
 

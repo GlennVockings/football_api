@@ -9,7 +9,7 @@ const { getPlayer } = require("../middleware/getHelpers");
 // GET ROUTES
 
 // gets all players
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     let players = await Player.find();
     res.status(201).json(players);
@@ -110,40 +110,53 @@ router.patch("/addSeason/:playerId", authenticateToken, async (req, res) => {
 
 // POST ROUTES
 
-router.post("/", authenticateToken, async (req, res) => {
+router.post("/", async (req, res) => {
   const newPlayers = req.body;
 
   try {
     const promises = [];
     for (const newPlayer of newPlayers) {
-      const { firstName, lastName, number, position, seasons } = newPlayer;
+      const { firstName, lastName, team } = newPlayer;
+
+      // if player exists then don't add it and tell the user
       let existingPlayer = await Player.findOne({ firstName, lastName });
-
       if (existingPlayer) {
-        return res.status(400).json({ message: "This player already exists" });
-      }
-
-      for (const season of seasons) {
-        for (const stat of season.stats) {
-          const foundTeam = await Team.findById(stat.team);
-          if (!foundTeam) {
-            return res.status(400).json({ message: "Team not found" });
-          }
-          stat.team = foundTeam._id;
-        }
+        return res
+          .status(400)
+          .json({
+            message: `This player ${firstName} ${lastName} already exists`,
+          });
       }
 
       const addedPlayer = new Player({
         firstName,
         lastName,
-        number,
-        position,
-        seasons,
+        number: 0,
+        position: "",
+        seasons: [
+          {
+            season: "2023-24",
+            status: "On going",
+            stats: [
+              {
+                team,
+                appearances: 0,
+                goals: 0,
+                started: 0,
+                yellowCards: 0,
+                redCards: 0,
+                playerofMatch: 0,
+                cleanSheet: 0,
+                assists: 0,
+              },
+            ],
+          },
+        ],
       });
 
       await addedPlayer.save();
 
-      for (const playerSeason of seasons) {
+      for (const playerSeason of addedPlayer.seasons) {
         for (const stat of playerSeason.stats) {
           const foundTeam = await Team.findById(stat.team);
           if (!foundTeam) {

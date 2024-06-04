@@ -21,7 +21,10 @@ const fixturesSchema = new Schema({
   },
   dateTime: String,
   venue: String,
-  status: String,
+  status: {
+    type: String,
+    default: "TBC",
+  },
   score: {
     home: Number,
     away: Number,
@@ -68,6 +71,8 @@ const seasonSchema = new Schema({
   season: String,
   status: String,
   fixtures: [fixturesSchema],
+  upcomingFixtures: [fixturesSchema],
+  completedFixtures: [fixturesSchema],
   table: [tableSchema],
   teams: [
     {
