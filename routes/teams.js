@@ -30,17 +30,63 @@ router.get("/list", async (req, res) => {
   }
 });
 
-// Get specific team
-router.get("/:teamId", getTeam, async (req, res) => {
+router.get("/team", async (req, res) => {
   try {
-    res.status(200).json(res.team);
+    let teamName = req.query.name;
+
+    // Function to capitalize each word
+    const capitalizeWords = (str) => {
+      return str.replace(/\b\w/g, (char) => char.toUpperCase());
+    };
+
+    // Capitalize the team name
+    teamName = capitalizeWords(teamName);
+
+    const foundTeam = await Team.findOne({ name: teamName }).populate(
+      "seasons.players",
+      "firstName lastName number position seasons"
+    );
+
+    res.status(200).json(foundTeam);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get specific team for the admin panel
+router.get("/:teamId", async (req, res) => {
+  try {
+    const foundTeam = await Team.findById(req.params.teamId)
+      .populate("seasons.league", "league")
+      .populate({
+        path: "seasons.players",
+        select: "firstName lastName number position",
+        populate: {
+          path: "seasons.stats",
+          populate: {
+            path: "team",
+            match: { team: req.params.teamId },
+            select:
+              "appearances goals assists yellowCards redCards started playerofMatch cleanSheet",
+          },
+        },
+      })
+      .exec();
+
+    if (!foundTeam) {
+      return res.status(404).json({ message: "Team not found" });
+    }
+
+    res.status(200).json({
+      ...foundTeam._doc,
+    });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 });
 
 // updates team information
-router.patch("/:teamId", async (req, res) => {
+router.patch("/:teamId/info", async (req, res) => {
   const { name, ground, parent, abbr } = req.body;
   const teamId = req.params.teamId;
   let foundTeam;
@@ -59,44 +105,24 @@ router.patch("/:teamId", async (req, res) => {
   }
 });
 
-// Adds a new season the team model
-router.patch("/addSeason/:teamId", authenticateToken, async (req, res) => {
-  const { season: teamSeason, status, league, players } = req.body;
-  let foundPlayers = [];
+router.patch("/:teamId/:seasonId/info", getTeam, async (req, res) => {
   try {
-    if (league === "") {
-      return res.status(404).json({ message: "No league entered" });
-    }
+    const { league, manager, stats } = req.body;
+
+    // find th season
+    const foundSeason = res.team.seasons.find(
+      (season) => season._id.toString() === req.params.seasonId
+    );
 
     const foundLeague = await League.findById(league);
 
-    if (players.length > 0) {
-      player.forEach(async (player) => {
-        const foundPlayer = await Player.findById(player);
+    foundSeason.league = foundLeague._id;
+    foundSeason.manager = manager;
+    foundSeason.stats = stats;
 
-        foundPlayers.push(foundPlayer._id);
-      });
-    }
-    const foundSeason = foundLeague.seasons.findIndex(
-      (season) => season.season === teamSeason
-    );
+    await res.team.save();
 
-    foundLeague.seasons[foundSeason].teams.push(req.params.teamId);
-
-    await foundLeague.save();
-
-    const team = await Team.findById(req.params.teamId);
-
-    team.seasons.push({
-      season: teamSeason,
-      status,
-      league: foundLeague._id,
-      players: foundPlayers,
-    });
-
-    await team.save();
-
-    res.status(201).json({ message: "New season added" });
+    res.status(200).json(res.team);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

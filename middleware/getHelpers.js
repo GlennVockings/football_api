@@ -7,7 +7,7 @@ async function getTeam(req, res, next) {
   try {
     team = await Team.findById(req.params.teamId)
       .populate("seasons.league", "league")
-      .populate("seasons.players", "firstName lastName");
+      .populate("seasons.players", "firstName lastName number position");
     if (team == null) {
       return res.status(404).json({ message: "Cannot find team" });
     }

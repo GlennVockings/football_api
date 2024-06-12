@@ -18,6 +18,16 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/list", async (req, res) => {
+  try {
+    const players = await Player.find().select("_id firstName lastName");
+
+    res.status(200).json(players);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 router.get("/:playerId", authenticateToken, getPlayer, async (req, res) => {
   try {
     res.status(201).json(res.player);
@@ -28,81 +38,19 @@ router.get("/:playerId", authenticateToken, getPlayer, async (req, res) => {
 
 // PATCH ROUTES
 
-router.patch("/:playerId", authenticateToken, async (req, res) => {
-  const { firstName, lastName, number, position, seasons } = req.body;
+router.patch("/:playerId", async (req, res) => {
+  const { firstName, lastName, number, position } = req.body;
   let foundPlayer;
   try {
-    seasons.forEach((season) => {
-      season.stats.forEach(async (stat) => {
-        const foundTeam = await Team.find(stat.team);
-        stat.team = foundTeam._id;
-      });
-    });
-
     foundPlayer = await Player.findById(req.params.playerId).then((player) => {
       player.firstName = firstName;
       player.lastName = lastName;
       player.number = number;
       player.position = position;
-      player.seasons = seasons;
       player.save();
     });
 
-    seasons.forEach((playerSeason) => {
-      playerSeason.stats.forEach(async (stat) => {
-        const foundTeam = await Team.findById(stat.team);
-
-        if (!foundTeam) {
-          return res.status(400).json({ message: "Team not found" });
-        }
-
-        const foundSeason = foundTeam.seasons.find(
-          (season) => season.season === playerSeason
-        );
-
-        const playerCheck = foundSeason.players.find(foundPlayer._id);
-
-        if (playerCheck !== null) {
-          foundSeason.players.push(foundPlayer._id);
-        }
-
-        await foundTeam.save();
-      });
-    });
-
     res.status(201).json(foundPlayer);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-router.patch("/addSeason/:playerId", authenticateToken, async (req, res) => {
-  const { season, status, stats } = req.body;
-  try {
-    const foundPlayer = await Player.findById(req.params.playerId);
-
-    for (const stat of stats) {
-      let foundTeam = await Team.findById(stat.team);
-      const foundSeason = foundTeam.seasons.find(
-        (season) => season.season == stat.season
-      );
-
-      if (!foundSeason) {
-        return res.status(404).json;
-      }
-
-      foundSeason.players.push(req.params.playerId);
-
-      await foundTeam.save();
-    }
-
-    foundPlayer.seasons.push({
-      season,
-      status,
-      stats,
-    });
-
-    await foundPlayer.save();
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -116,16 +64,14 @@ router.post("/", async (req, res) => {
   try {
     const promises = [];
     for (const newPlayer of newPlayers) {
-      const { firstName, lastName, team } = newPlayer;
+      const { firstName, lastName, team, season } = newPlayer;
 
       // if player exists then don't add it and tell the user
       let existingPlayer = await Player.findOne({ firstName, lastName });
       if (existingPlayer) {
-        return res
-          .status(400)
-          .json({
-            message: `This player ${firstName} ${lastName} already exists`,
-          });
+        return res.status(400).json({
+          message: `This player ${firstName} ${lastName} already exists`,
+        });
       }
 
       const addedPlayer = new Player({
@@ -135,7 +81,7 @@ router.post("/", async (req, res) => {
         position: "",
         seasons: [
           {
-            season: "2023-24",
+            season,
             status: "On going",
             stats: [
               {
@@ -163,7 +109,7 @@ router.post("/", async (req, res) => {
             return res.status(400).json({ message: "Team not found" });
           }
           const foundSeason = foundTeam.seasons.find(
-            (season) => season.season === playerSeason.season
+            (teamSeason) => teamSeason.season === season
           );
           if (!foundSeason) {
             return res.status(400).json({ message: "Season not found" });
