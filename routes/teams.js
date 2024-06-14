@@ -1,16 +1,14 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const Team = require("../models/team");
-const League = require("../models/league");
-const Player = require("../models/player");
-const { authenticateToken } = require("../middleware/auth");
 const { getTeam } = require("../middleware/getHelpers");
-const player = require("../models/player");
+const Player = require("../models/player");
 
 // Gets all teams
 router.get("/", async (req, res) => {
   try {
-    const teams = await Team.find();
+    const teams = await find();
 
     return res.status(200).json(teams);
   } catch (err) {
@@ -20,7 +18,7 @@ router.get("/", async (req, res) => {
 
 router.get("/list", async (req, res) => {
   try {
-    const teams = await Team.find()
+    const teams = await find()
       .sort({ name: "asc" })
       .select("_id name parent abbr");
 
@@ -42,7 +40,7 @@ router.get("/team", async (req, res) => {
     // Capitalize the team name
     teamName = capitalizeWords(teamName);
 
-    const foundTeam = await Team.findOne({ name: teamName }).populate(
+    const foundTeam = await findOne({ name: teamName }).populate(
       "seasons.players",
       "firstName lastName number position seasons"
     );
@@ -56,30 +54,27 @@ router.get("/team", async (req, res) => {
 // Get specific team for the admin panel
 router.get("/:teamId", async (req, res) => {
   try {
-    const foundTeam = await Team.findById(req.params.teamId)
-      .populate("seasons.league", "league")
-      .populate({
-        path: "seasons.players",
-        select: "firstName lastName number position",
-        populate: {
-          path: "seasons.stats",
-          populate: {
-            path: "team",
-            match: { team: req.params.teamId },
-            select:
-              "appearances goals assists yellowCards redCards started playerofMatch cleanSheet",
-          },
-        },
-      })
-      .exec();
+    const teamId = req.params.teamId;
 
-    if (!foundTeam) {
-      return res.status(404).json({ message: "Team not found" });
+    const foundTeam = await Team.findById(teamId)
+      .populate("seasons.league", "league")
+      .populate("seasons.players", "firstName lastName seasons");
+
+    for (let season of foundTeam.seasons) {
+      season.players.map((player) => {
+        const foundSeason = player.seasons.find(
+          (playerSeason) => playerSeason.season === season.season
+        );
+
+        const foundStat = foundSeason.stats.find(
+          (playerStat) => playerStat.team.toString() === teamId
+        );
+
+        foundSeason.stats = foundStat;
+      });
     }
 
-    res.status(200).json({
-      ...foundTeam._doc,
-    });
+    res.status(200).json(foundTeam);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -91,7 +86,7 @@ router.patch("/:teamId/info", async (req, res) => {
   const teamId = req.params.teamId;
   let foundTeam;
   try {
-    foundTeam = await Team.findById(teamId).then((team) => {
+    foundTeam = await findById(teamId).then((team) => {
       team.name = name;
       team.ground = ground;
       team.parent = parent;
@@ -114,7 +109,7 @@ router.patch("/:teamId/:seasonId/info", getTeam, async (req, res) => {
       (season) => season._id.toString() === req.params.seasonId
     );
 
-    const foundLeague = await League.findById(league);
+    const foundLeague = await _findById(league);
 
     foundSeason.league = foundLeague._id;
     foundSeason.manager = manager;
@@ -129,11 +124,11 @@ router.patch("/:teamId/:seasonId/info", getTeam, async (req, res) => {
 });
 
 // add a new team
-router.post("/", authenticateToken, async (req, res) => {
+router.post("/", async (req, res) => {
   const { name, ground, parent, seasons } = req.body;
 
   try {
-    let existingTeam = await Team.findOne({ name });
+    let existingTeam = await findOne({ name });
 
     if (existingTeam) {
       res.status(400).json({
@@ -154,7 +149,7 @@ router.post("/", authenticateToken, async (req, res) => {
       for (let i = 0; i < seasons.length; i++) {
         const { league, season: teamSeason } = seasons[i];
 
-        const foundLeague = await League.findById(league);
+        const foundLeague = await _findById(league);
 
         const currentSeason = foundLeague.seasons.find(
           (season) => season.season === teamSeason
@@ -186,9 +181,9 @@ router.post("/", authenticateToken, async (req, res) => {
 // DELETE ROUTES
 
 // delete a team
-router.delete("/:teamId", authenticateToken, getTeam, async (req, res) => {
+router.delete("/:teamId", getTeam, async (req, res) => {
   try {
-    const foundPlayers = await Player.find({
+    const foundPlayers = await _find({
       "seasons.season.team": res.team._id,
     });
 
@@ -199,7 +194,7 @@ router.delete("/:teamId", authenticateToken, getTeam, async (req, res) => {
       });
     }
 
-    const foundLeague = await League.findById(res.team.league._id);
+    const foundLeague = await _findById(res.team.league._id);
 
     const seasonIndex = foundLeague.seasons.findIndex(
       (season) => season.status === STATUS
@@ -217,7 +212,7 @@ router.delete("/:teamId", authenticateToken, getTeam, async (req, res) => {
     // save updated league with deleted team
     await foundLeague.save();
 
-    await Team.findByIdAndDelete(req.params.teamId);
+    await findByIdAndDelete(req.params.teamId);
 
     res.status(201).json({ message: "Deleted team" });
   } catch (err) {
