@@ -8,7 +8,7 @@ const Player = require("../models/player");
 // Gets all teams
 router.get("/", async (req, res) => {
   try {
-    const teams = await find();
+    const teams = await Team.find();
 
     return res.status(200).json(teams);
   } catch (err) {
@@ -18,7 +18,7 @@ router.get("/", async (req, res) => {
 
 router.get("/list", async (req, res) => {
   try {
-    const teams = await find()
+    const teams = await Team.find()
       .sort({ name: "asc" })
       .select("_id name parent abbr");
 
@@ -86,7 +86,7 @@ router.patch("/:teamId/info", async (req, res) => {
   const teamId = req.params.teamId;
   let foundTeam;
   try {
-    foundTeam = await findById(teamId).then((team) => {
+    foundTeam = await Team.findById(teamId).then((team) => {
       team.name = name;
       team.ground = ground;
       team.parent = parent;

@@ -62,66 +62,103 @@ router.post("/", async (req, res) => {
   const newPlayers = req.body;
 
   try {
-    const promises = [];
     for (const newPlayer of newPlayers) {
       const { firstName, lastName, team, season } = newPlayer;
 
-      // if player exists then don't add it and tell the user
-      let existingPlayer = await Player.findOne({ firstName, lastName });
-      if (existingPlayer) {
-        return res.status(400).json({
-          message: `This player ${firstName} ${lastName} already exists`,
-        });
-      }
+      // find if player already exists
+      let foundPlayer = await Player.findOne({ firstName, lastName });
 
-      const addedPlayer = new Player({
-        firstName,
-        lastName,
-        number: 0,
-        position: "",
-        seasons: [
-          {
-            season,
-            status: "On going",
-            stats: [
-              {
-                team,
-                appearances: 0,
-                goals: 0,
-                started: 0,
-                yellowCards: 0,
-                redCards: 0,
-                playerofMatch: 0,
-                cleanSheet: 0,
-                assists: 0,
-              },
-            ],
-          },
-        ],
+      // find the team
+      const foundTeam = await Team.findById(team).populate({
+        path: "seasons.players",
+        model: "Player",
+        select: "_id firstName lastName",
       });
 
-      await addedPlayer.save();
+      // get the team from the season
+      const foundTeamSeason = foundTeam.seasons.find(
+        (teamSeason) => teamSeason.season === season
+      );
 
-      for (const playerSeason of addedPlayer.seasons) {
-        for (const stat of playerSeason.stats) {
-          const foundTeam = await Team.findById(stat.team);
-          if (!foundTeam) {
-            return res.status(400).json({ message: "Team not found" });
-          }
-          const foundSeason = foundTeam.seasons.find(
-            (teamSeason) => teamSeason.season === season
-          );
-          if (!foundSeason) {
-            return res.status(400).json({ message: "Season not found" });
-          }
-          foundSeason.players.push(addedPlayer._id);
-          promises.push(foundTeam.save());
+      // check if a player has been found
+      if (foundPlayer) {
+        // if player has been found in given team then return a message to the user
+        const foundPlayerInTeam = foundTeamSeason.players.some(
+          (player) =>
+            player.firstName === firstName && player.lastName === lastName
+        );
+        if (foundPlayerInTeam) {
+          continue;
         }
-      }
-    }
 
-    // Wait for all teams to be saved
-    await Promise.all(promises);
+        // find the season in the player
+        const foundPlayerSeason = foundPlayer.seasons.find(
+          (playerSeason) => playerSeason.season === season
+        );
+
+        if (foundPlayerSeason) {
+          const foundPlayerStats = foundPlayerSeason.stats.find(
+            (playerStat) => playerStat.team === foundTeam
+          );
+
+          if (foundPlayerStats) {
+            return res.status(400).json({
+              message: `This player ${firstName} ${lastName} already exists`,
+            });
+          } else {
+            const newStat = {
+              team,
+              appearances: 0,
+              goals: 0,
+              started: 0,
+              yellowCards: 0,
+              redCards: 0,
+              playerofMatch: 0,
+              cleanSheet: 0,
+              assists: 0,
+            };
+
+            foundPlayerSeason.stats.push(newStat);
+
+            foundTeamSeason.players.push(foundPlayer._id);
+
+            await foundPlayer.save();
+          }
+        }
+      } else {
+        const player = new Player({
+          firstName,
+          lastName,
+          number: 0,
+          position: "",
+          seasons: [
+            {
+              season,
+              status: "On going",
+              stats: [
+                {
+                  team,
+                  appearances: 0,
+                  goals: 0,
+                  started: 0,
+                  yellowCards: 0,
+                  redCards: 0,
+                  playerofMatch: 0,
+                  cleanSheet: 0,
+                  assists: 0,
+                },
+              ],
+            },
+          ],
+        });
+
+        await player.save();
+
+        foundTeamSeason.players.push(player._id);
+      }
+
+      await foundTeam.save();
+    }
 
     res.status(201).json({ message: "Added players" });
   } catch (err) {
