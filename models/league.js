@@ -76,8 +76,26 @@ const seasonSchema = new Schema({
   table: [tableSchema],
   teams: [
     {
-      type: Schema.Types.ObjectId,
-      ref: "Team",
+      team: {
+        type: Schema.Types.ObjectId,
+        ref: "Team",
+      },
+      goals: {
+        type: Number,
+        default: 0,
+      },
+      cleanSheets: {
+        type: Number,
+        default: 0,
+      },
+      yellowCards: {
+        type: Number,
+        default: 0,
+      },
+      redCards: {
+        type: Number,
+        default: 0,
+      },
     },
   ],
 });

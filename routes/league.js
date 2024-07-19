@@ -37,7 +37,7 @@ router.get("/league", async (req, res) => {
       league: formatTitle(leagueName),
     }).populate([
       { path: "seasons.table.team", model: "Team", select: "name" }, // Populating seasons.table.team with name
-      { path: "seasons.teams", select: "name ground" }, // Populating teams array with name and ground fields
+      { path: "seasons.teams", select: "name" }, // Populating teams array with name and ground fields
     ]);
 
     if (!league) {
@@ -51,61 +51,22 @@ router.get("/league", async (req, res) => {
     // Process each season
     const seasonsSummary = league.seasons.map((season) => {
       // Filter teams for the current season
-      const filteredTeams = teams.filter((team) => {
-        const foundSeason = team.seasons.find(
-          (teamSeason) => teamSeason.season === season.season
-        );
-        return (
-          foundSeason && foundSeason.league.toString() === league._id.toString()
-        );
-      });
 
-      const teamNames = filteredTeams.map((team) => team.name);
+      // Get the top 10 scoring players
+      // const playerStats = players.map((player) => {
+      //   const playerSeason = player.seasons.find(
+      //     (s) => s.season === season.season
+      //   );
+      //   return {
+      //     player: `${player.firstName} ${player.lastName}`,
+      //     team: playerSeason.stats.team.name,
+      //     goals: playerSeason.stats.goals,
+      //   };
+      // });
 
-      // Filter players for the current season
-      const filteredPlayers = players.filter((player) => {
-        return player.seasons.some(
-          (playerSeason) =>
-            playerSeason.season === season.season &&
-            playerSeason.stats.some((stat) =>
-              teamNames.includes(stat.team.name)
-            )
-        );
-      });
-
-      // Utility function to get top three team stats
-      const getTopThreeTeamStats = (items, season, statKey) => {
-        return items
-          .map((item) => {
-            const foundSeason = item.seasons.find(
-              (seasonItem) => seasonItem.season === season.season
-            );
-            const stat = foundSeason ? foundSeason.stats[statKey] : 0;
-            return { team: item.name, stat };
-          })
-          .sort((a, b) => b.stat - a.stat)
-          .slice(0, 3);
-      };
-
-      // Utility function to get top three player stats
-      const getTopThreePlayerStats = (players, season, statKey) => {
-        return players
-          .map((player) => {
-            const foundSeason = player.seasons.find(
-              (playerSeason) => playerSeason.season === season.season
-            );
-            const foundStat = foundSeason.stats.find((stat) =>
-              teamNames.includes(stat.team.name)
-            );
-            return {
-              player: `${player.firstName} ${player.lastName}`,
-              team: foundStat.team.name,
-              stat: foundStat[statKey],
-            };
-          })
-          .sort((a, b) => b.stat - a.stat)
-          .slice(0, 3);
-      };
+      // const topScoringPlayers = playerStats
+      //   .sort((a, b) => b.goals - a.goals)
+      //   .slice(0, 10);
 
       return {
         season: season.season,
@@ -116,59 +77,16 @@ router.get("/league", async (req, res) => {
         upcomingFixtures: season.upcomingFixtures,
         completedFixtures: season.completedFixtures,
         stats: {
-          team: [
-            {
-              name: "Goals",
-              stats: getTopThreeTeamStats(filteredTeams, season, "goals"),
-            },
-            {
-              name: "Yellow Cards",
-              stats: getTopThreeTeamStats(filteredTeams, season, "yellowCards"),
-            },
-            {
-              name: "Red Cards",
-              stats: getTopThreeTeamStats(filteredTeams, season, "redCards"),
-            },
-            {
-              name: "Clean Sheets",
-              stats: getTopThreeTeamStats(filteredTeams, season, "cleanSheets"),
-            },
-          ],
-          player: [
-            {
-              name: "Goals",
-              stats: getTopThreePlayerStats(filteredPlayers, season, "goals"),
-            },
-            {
-              name: "Yellow Cards",
-              stats: getTopThreePlayerStats(
-                filteredPlayers,
-                season,
-                "yellowCards"
-              ),
-            },
-            {
-              name: "Red Cards",
-              stats: getTopThreePlayerStats(
-                filteredPlayers,
-                season,
-                "redCards"
-              ),
-            },
-            {
-              name: "Clean Sheets",
-              stats: getTopThreePlayerStats(
-                filteredPlayers,
-                season,
-                "cleanSheets"
-              ),
-            },
-          ],
+          // player: topScoringPlayers,
         },
       };
     });
 
-    res.status(200).json({ league: league.league, seasons: seasonsSummary });
+    res.status(200).json({
+      _id: league._id,
+      league: league.league,
+      seasons: seasonsSummary,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
